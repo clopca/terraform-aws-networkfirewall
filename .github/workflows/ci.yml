@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for module in logging routes; do
+          for module in logging routes rule-groups policy-control; do
             terraform -chdir="modules/${module}" init -backend=false -lockfile=readonly
             terraform -chdir="modules/${module}" validate -no-color
           done
@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for example in basic complete_logging; do
+          for example in basic complete_logging rule_groups_suricata policy_control_gate; do
             terraform -chdir="examples/${example}" init -backend=false -lockfile=readonly
             terraform -chdir="examples/${example}" validate -no-color
           done

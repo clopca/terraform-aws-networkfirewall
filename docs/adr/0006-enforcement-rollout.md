@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the phase-2 contract
+Implemented in phase 2
 
 ## Decision
 
@@ -16,3 +16,9 @@ Every future stateful rule-group reference will declare `kind = "managed" | "cus
 - terminal `pass` rules and stateless drops remain outside this gate and are documented as always effective.
 
 Phase 2 will also enforce the current service limits: no more than 20 stateful and 20 stateless references per policy, priorities from 1 through 65535 with no duplicates, and rule-group capacity from 1 through 30000. Capacity totals are checked only when the required metadata is plan-known; external ARNs remain explicitly unverified.
+
+## Implementation
+
+`modules/policy-control` implements this decision as a pure binding layer. Every stateful slot declares `kind`, STRICT_ORDER compatibility, capacity, enforcement level, and composable behavior `{actions, has_terminal_action, override_coverage}`. A blocking customer slot below its enforcement level must provide an independently validated `observation_arn`; otherwise plan fails with the two safe exits. Only managed slots render `DROP_TO_ALERT`.
+
+`incident_control.group_overrides` takes precedence over `observe_all_stateful`, which takes precedence over `enforce_from`. Temporary posture requires change, owner, and expiry metadata; expiry is deliberately not an automatic Terraform timer. `home_net_cidrs` is the only policy-variable source, engine restart-prone options are explicit, and release keys make TLS presence durable identity.

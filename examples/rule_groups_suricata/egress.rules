@@ -1,0 +1,2 @@
+alert tcp $WORKLOADS any -> any $WEB_PORTS (msg:"Observed web egress"; flow:to_server; sid:4100001; rev:1;)
+drop tcp $WORKLOADS any -> any 23 (msg:"Block outbound Telnet"; flow:to_server; sid:4100002; rev:1;)

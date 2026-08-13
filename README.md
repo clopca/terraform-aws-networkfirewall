@@ -69,6 +69,22 @@ module "network_firewall_logging" {
 }
 ```
 
+## Rule groups and policy control
+
+[`modules/rule-groups`](modules/rule-groups) is Suricata-first and also supports closed domain-list, native stateful, and stateless lanes. It validates required IP/port bindings, Suricata SID uniqueness/ranges, capacity, source XOR, and external attestation metadata before AWS apply.
+
+AWS supports three operational ownership models, all first-class here:
+
+| Model | Use when | Content owner |
+| --- | --- | --- |
+| IaC pure | Rules move through reviewed Terraform releases. | `content_management = "terraform"`; Terraform detects content drift. |
+| AWS managed | AWS-maintained StrictOrder threat intelligence is appropriate. | AWS updates content; Terraform binds the managed ARN. |
+| Dynamic SecOps | SOC/SOAR must update IOCs or signatures in seconds to minutes. | `content_management = "external"`; Terraform owns group structure and ignores post-bootstrap content. |
+
+[`modules/policy-control`](modules/policy-control) is a pure policy-release and ARN-binding layer. Its slots accept AWS managed ARNs, outputs from `modules/rule-groups`, or external SOC/pipeline ARNs. Rule content never enters the contract, so a referenced content update does not appear in its plan; an apply changes only structure. The provider exposes no rule-group data source, so ARN existence and metadata such as kind/capacity are caller attestations checked for internal consistency but not remotely discovered.
+
+Policy control supports only `STRICT_ORDER`, emits `DROP_TO_ALERT` only for managed groups, requires customer alert-only variants when a blocking group is observed, models composable behavior/override coverage, and provides incident-wide plus per-group overrides. Policy keys are immutable release identities ending `-plain` or `-tls`; use simultaneous candidate, active, and last-known-good releases rather than toggling TLS or overwriting rollback policy.
+
 ## Routes bridge
 
 [`modules/routes`](modules/routes) creates only caller-keyed `aws_route` resources and preserves endpoint affinity with `availability_zone`. Route tables remain externally owned. IPv4 and IPv6 CIDR destinations are supported; AWS provider 6.59 rejects managed prefix-list destinations combined with Network Firewall endpoint targets, so the bridge fails closed and asks callers to expand those entries to CIDR routes.
@@ -81,6 +97,8 @@ Stable outputs are `firewall_arns`, `firewall_ids`, `firewall_names`, `firewall_
 
 - [`basic`](examples/basic): a dual-stack firewall in caller-owned subnets.
 - [`complete_logging`](examples/complete_logging): ALERT, FLOW, and TLS with CloudWatch, S3, and Firehose destinations.
+- [`rule_groups_suricata`](examples/rule_groups_suricata): an attested Suricata bundle with typed IP/port bindings and SID range.
+- [`policy_control_gate`](examples/policy_control_gate): observation/selective/enforce, incident overrides, and candidate/active/LKG releases.
 
 ## Upgrade
 
