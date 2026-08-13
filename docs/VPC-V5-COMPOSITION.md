@@ -162,27 +162,13 @@ bridge does not import or inspect route ownership.
 
 ## Forward and return path
 
-```mermaid
-flowchart LR
-  subgraph AZA[Availability Zone A]
-    AApp[Application subnet A] -->|default route| AEP[Firewall endpoint A]
-    AEP --> AFW[Network Firewall]
-    AFW --> ANAT[NAT Gateway A]
-    ANAT --> AIGW[Internet gateway]
-    AIGW -->|return| ANAT
-    ANAT -->|return route| AEP
-    AEP -->|application CIDR| AApp
-  end
-  subgraph AZB[Availability Zone B]
-    BApp[Application subnet B] -->|default route| BEP[Firewall endpoint B]
-    BEP --> BFW[Network Firewall]
-    BFW --> BNAT[NAT Gateway B]
-    BNAT --> BIGW[Internet gateway]
-    BIGW -->|return| BNAT
-    BNAT -->|return route| BEP
-    BEP -->|application CIDR| BApp
-  end
-```
+For outbound traffic in each AZ, the application route table sends the default
+route to its AZ-local firewall endpoint. Allowed traffic leaves the firewall
+subnet through the NAT Gateway in that AZ and then the Internet Gateway. Return
+traffic reaches the same NAT Gateway, follows the application CIDR route back to
+the same firewall endpoint, and uses the VPC local route to reach the workload.
+The same sequence must exist independently in every selected AZ.
+
 
 The exact route tables vary by topology, but both directions must traverse the
 same firewall endpoint AZ. NAT and internet routing normally occur after

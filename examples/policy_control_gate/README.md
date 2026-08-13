@@ -6,20 +6,11 @@ The ARNs are illustrative. Supply real AWS-managed, `modules/rule-groups`, or SO
 
 ## Release and traffic flow
 
-```mermaid
-flowchart TB
-  RG[Managed + customer rule-group ARNs] --> C[Observation candidate]
-  RG --> A[Selective active]
-  RG --> LKG[Enforced last-known-good]
-  RG --> INC[Incident release]
-  C --> Select[Firewall binds one policy ARN]
-  A --> Select
-  LKG --> Select
-  INC --> Select
-  Forward[Forward packet] --> Select
-  Return[Return packet] --> Select
-  Select --> Logs[ALERT/FLOW evidence]
-```
+Managed and customer rule-group ARNs feed four immutable policy releases. The
+firewall binds exactly one candidate, active, last-known-good, or incident ARN;
+forward and return packets use the same selected policy, while ALERT and FLOW
+telemetry provide promotion and rollback evidence.
+
 
 Managed groups can use `DROP_TO_ALERT`; blocking customer groups use their
 alert-only observation ARN. Stateless groups remain enforced. Incident expiry is

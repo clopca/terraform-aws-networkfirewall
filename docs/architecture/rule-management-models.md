@@ -1,36 +1,20 @@
 # Rule-management models
 
-```mermaid
-flowchart LR
-  subgraph IaC[IaC pure]
-    PR[Reviewed rule bundle] --> TF[Terraform]
-    TF --> IACRG[Created rule group: structure + content]
-    IACRG --> IACPLAN[Content drift appears in plan]
-  end
+In IaC-pure mode, a reviewed bundle enters Terraform and both structural and
+content drift appear in plans. For AWS managed groups, AWS owns changing
+content while Terraform binds the managed ARN and caller-declared metadata;
+only this model can use `DROP_TO_ALERT`. In dynamic SecOps mode, Terraform
+creates the structural identity and seed content, then a SOC/SOAR system updates
+live content through `UpdateRuleGroup` while Terraform ignores post-bootstrap
+content drift.
 
-  subgraph Managed[AWS managed]
-    AWS[AWS content lifecycle] --> MRG[Managed rule group ARN]
-    TF2[Terraform metadata + binding] --> MRG
-    MRG --> DTOA[Managed-only DROP_TO_ALERT option]
-  end
 
-  subgraph SecOps[Dynamic SecOps]
-    TF3[Terraform structure + seed] --> ERG[Externally managed-content group]
-    SOC[SOC/SOAR UpdateRuleGroup] --> ERG
-    ERG --> IGN[Post-bootstrap content drift ignored]
-  end
-```
+A release verifies the bundle SHA-256 against an independently produced
+manifest digest or signature, records immutable build and AWS validation
+context, runs parser plus match/no-match tests, and publishes a versioned rule
+group. `rule_group_records` carries that group identity and declared metadata
+into the policy-control release.
 
-```mermaid
-flowchart TB
-  BUNDLE[Rule bundle] --> DIGEST[Bundle SHA-256]
-  EVIDENCE[Independent manifest + digest/signature] --> VERIFY[CI verification]
-  DIGEST --> VERIFY
-  VERIFY --> AWSVAL[AWS parser and match/no-match tests]
-  AWSVAL --> RELEASE[Versioned rule group]
-  RELEASE --> RECORDS[rule_group_records]
-  RECORDS --> POLICY[Policy-control release]
-```
 
 `attested` validates evidence shape only. Trust comes from independent production,
 signature/digest verification, immutable build context, and reviewed AWS test

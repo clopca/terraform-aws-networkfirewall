@@ -12,17 +12,11 @@ records without adopting lifecycle ownership.
 
 ## Architecture and traffic
 
-```mermaid
-flowchart LR
-  Owner[External firewall owner] --> Existing[Existing Network Firewall]
-  Data[Root inject-mode data source] --> Existing
-  Existing --> Records[Identity + endpoint records by AZ]
-  Records --> Consumer[External route/logging consumers]
-  Workload[Forward traffic] --> Existing
-  Existing --> Destination[Destination]
-  Destination -->|return through externally owned routes| Existing
-  Existing --> Workload
-```
+An external state owns the firewall, policy binding, endpoints, and routes. This
+configuration reads the firewall ARN and publishes normalized endpoint records;
+external forward and return routes must already select the same endpoint AZ for
+the observed flow.
+
 
 Inject mode observes configuration. Forward and return routes remain wholly
 external and must already preserve same-AZ symmetry.

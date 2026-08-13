@@ -13,23 +13,12 @@ before reaching the TGW.
 
 ## Architecture and traffic
 
-```mermaid
-flowchart LR
-  Spoke[Spoke workload] --> TGW[Transit Gateway appliance mode]
-  TGW --> AttachRT[TGW attachment RT A]
-  AttachRT -->|default| EPA[Firewall endpoint A]
-  EPA --> NFW[Network Firewall]
-  NFW --> FwRT[Firewall RT A]
-  FwRT -->|default| NATA[NAT Gateway A]
-  NATA -->|SNAT| IGW[Internet Gateway]
-  IGW -->|return| NATA
-  NATA --> NatRT[NAT subnet RT A]
-  NatRT -->|spoke CIDR| EPA
-  EPA --> NFW
-  NFW --> FwRT
-  FwRT -->|spoke CIDR| TGW
-  TGW --> Spoke
-```
+Spoke traffic arrives through the TGW attachment in the selected appliance-mode
+AZ, traverses the AZ-local firewall endpoint, and exits through the AZ-local NAT
+Gateway and Internet Gateway. Return traffic reaches that NAT Gateway, follows
+the spoke CIDR route through the same firewall endpoint, and returns through the
+TGW to the source spoke.
+
 
 The source repeats this path in both AZs. SNAT occurs after inspection on the
 forward path, and the return route sends the original spoke destination through

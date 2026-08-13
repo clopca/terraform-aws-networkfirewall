@@ -11,18 +11,11 @@ terraform plan
 
 ## Traffic and telemetry flow
 
-```mermaid
-flowchart LR
-  Client[Forward traffic] --> EP[Firewall endpoint]
-  EP --> NFW[Network Firewall]
-  NFW --> Destination[Destination]
-  Destination -->|return traffic| EP
-  EP --> NFW
-  NFW --> Client
-  NFW --> ALERT[ALERT: CloudWatch]
-  NFW --> FLOW[FLOW: external S3]
-  NFW --> TLS[TLS: external Firehose]
-```
+Forward and return packets traverse the same firewall endpoint and produce the
+configured log classes. ALERT records are delivered to the managed CloudWatch
+log group, FLOW records to the external S3 bucket, and TLS records to the
+external Firehose stream. Routing remains externally owned.
+
 
 The firewall and CloudWatch log group incur charges; S3 and Firehose resources
 must already exist with correct service permissions. This example creates no

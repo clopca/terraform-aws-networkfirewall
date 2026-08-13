@@ -1,24 +1,13 @@
 # Module composition
 
-```mermaid
-flowchart TB
-  subgraph External[External or VPC stack]
-    VPC[VPC v5: VPC, subnets, route tables, NAT, IGW]
-    EXT[Existing firewall/policy/rule ARNs]
-    DEST[S3 bucket and Firehose stream]
-  end
+VPC v5 supplies the VPC ID and firewall subnet IDs by AZ to the root module.
+Rule-group records flow from `modules/rule-groups` to
+`modules/policy-control`; the selected policy ARN then flows to the root
+firewall. The root endpoint map feeds either VPC v5 native routes or
+`modules/routes`, while the firewall ARN feeds `modules/logging`. Existing
+firewall, policy, and rule ARNs may enter at their explicit inject boundaries;
+S3 buckets and Firehose streams remain external to logging.
 
-  RG[modules/rule-groups] -->|rule_group_records| PC[modules/policy-control]
-  PC -->|policy_arns| ROOT[Network Firewall root]
-  EXT --> ROOT
-  VPC -->|vpc_id and firewall subnet IDs by AZ| ROOT
-  ROOT -->|firewall_arns| LOG[modules/logging]
-  DEST --> LOG
-  ROOT -->|endpoint IDs by firewall by AZ| VROUTE[VPC v5 native routes]
-  ROOT -->|endpoint IDs by AZ| ROUTES[modules/routes]
-  VPC --> VROUTE
-  VPC -->|external route-table IDs and AZs| ROUTES
-```
 
 ## Ownership rules
 

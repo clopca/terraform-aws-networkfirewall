@@ -92,7 +92,7 @@ Every new example should include:
 
 - prerequisites, placeholders, and cost warning;
 - ownership and route matrices where applicable;
-- forward and return Mermaid diagrams;
+- precise forward and return path descriptions with the relevant HCL;
 - init/validate/plan guidance and runtime verification;
 - an explicit statement that static validation does not prove traffic or AWS
   resource existence.

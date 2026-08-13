@@ -4,15 +4,11 @@ Creates one STRICT_ORDER rule group from `egress.rules`, with environment bindin
 
 ## Content and packet flow
 
-```mermaid
-flowchart LR
-  Bundle[egress.rules + typed sets] --> Validate[Independent digest and AWS validation]
-  Validate --> Group[Versioned STRICT_ORDER rule group]
-  Forward[Forward packet] --> Group
-  Return[Return packet] --> Group
-  Group --> Policy[Policy-control ARN binding]
-  Group --> Alerts[Expected match/no-match evidence]
-```
+The reviewed `egress.rules` bundle and typed IP/port sets create one versioned
+STRICT_ORDER group. Both directions of an established flow are evaluated by
+that group when its record is bound into a policy-control release; independent
+match and no-match tests establish the expected behavior.
+
 
 Terraform checks the closed source lane, set references, capacity, SID range,
 and attestation shape. AWS remains the full Suricata parser, and Terraform cannot

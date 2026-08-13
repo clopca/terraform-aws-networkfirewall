@@ -6,13 +6,11 @@ The IDs and CIDRs in `main.tf` are deterministic test values. Replace them from 
 
 ## Address transition and preserved traffic intent
 
-```mermaid
-flowchart LR
-  Old[Pre-v1 indexed route address] --> V1[v1 intermediate address]
-  V1 --> V2[v2 semantic caller key]
-  Forward[Forward route identity] --> EP[Same intended firewall endpoint]
-  Return[Return route identity] --> EP
-```
+The move chain changes only Terraform addresses: each pre-v1 indexed route
+moves through its v1 intermediate address to a v2 semantic caller key. The
+physical forward and return route intent remains unchanged throughout the
+state-only transition.
+
 
 The migration changes Terraform addresses, not the intended forward/return path.
 Rehearse on copied state, save the plan, and require zero delete/replace actions

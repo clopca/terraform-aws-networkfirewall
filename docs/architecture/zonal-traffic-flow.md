@@ -3,37 +3,16 @@
 AWS Network Firewall endpoints are zonal. A route table must select the endpoint
 for its own Availability Zone, and the return path must preserve symmetry.
 
-```mermaid
-flowchart LR
-  ClientA[Workload A] -->|forward: 0.0.0.0/0| AppRTA[Application RT A]
-  AppRTA --> EPA[vpce firewall A]
-  EPA --> NFW[AWS Network Firewall]
-  NFW --> FwRTA[Firewall RT A]
-  FwRTA --> NATA[NAT Gateway A]
-  NATA --> IGW[Internet Gateway]
-  IGW -->|return| NATA
-  NATA --> NatRTA[NAT subnet RT A]
-  NatRTA --> EPA
-  EPA --> NFW
-  NFW -->|application CIDR| ClientA
-```
+In Availability Zone A, the workload default route selects firewall endpoint A.
+The endpoint sends the packet through AWS Network Firewall, and the firewall
+subnet route sends an allowed packet to NAT Gateway A and then the Internet
+Gateway. The response returns through NAT Gateway A, whose route for the
+application CIDR selects firewall endpoint A; inspection completes before the
+VPC local route returns the packet to the workload.
 
-```mermaid
-sequenceDiagram
-  participant W as Workload in AZ A
-  participant E as NFW endpoint A
-  participant F as Network Firewall
-  participant N as NAT Gateway A
-  participant I as Internet
-  W->>E: Forward packet
-  E->>F: Inspect
-  F->>N: Allowed packet
-  N->>I: Source-NAT and send
-  I-->>N: Response
-  N-->>E: Return route to endpoint A
-  E-->>F: Inspect reverse flow
-  F-->>W: Route to workload CIDR
-```
+
+
+
 
 ## Invariants
 

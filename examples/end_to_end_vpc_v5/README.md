@@ -17,27 +17,12 @@ illustrative. Replace them and complete a security review before plan or apply.
 
 ## Architecture and traffic
 
-```mermaid
-flowchart LR
-  subgraph A[Availability Zone A]
-    AppA[Application A] -->|forward default| EPA[Firewall endpoint A]
-    EPA --> FWA[Network Firewall]
-    FWA --> NATA[NAT Gateway A]
-    NATA --> IGW[Internet gateway]
-    IGW -->|return| NATA
-    NATA -->|10.20.10.0/24| EPA
-    EPA -->|VPC local route| AppA
-  end
-  subgraph B[Availability Zone B]
-    AppB[Application B] -->|forward default| EPB[Firewall endpoint B]
-    EPB --> FWB[Network Firewall]
-    FWB --> NATB[NAT Gateway B]
-    NATB --> IGW
-    IGW -->|return| NATB
-    NATB -->|10.20.10.0/24| EPB
-    EPB -->|VPC local route| AppB
-  end
-```
+In each AZ, application traffic follows the default route to the AZ-local
+firewall endpoint, traverses Network Firewall, and exits through the AZ-local
+NAT Gateway and Internet Gateway. Return traffic reaches the same NAT Gateway,
+follows the application CIDR route through the same firewall endpoint, and then
+uses the local VPC route to reach the workload.
+
 
 The source uses the application group's computed `/24` (`10.20.10.0/24`) for the
 more-specific public-subnet return route. Confirm actual generated CIDRs before

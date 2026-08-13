@@ -6,16 +6,11 @@ Replace every illustrative ID/ARN before apply. Confirm that no other Terraform 
 
 ## Forward and return path
 
-```mermaid
-flowchart LR
-  WorkloadA[Workload subnet A] --> RTA[External route table A]
-  RTA -->|default| EPA[Firewall endpoint A]
-  EPA --> NFW[Network Firewall]
-  NFW --> Next[Externally routed next hop]
-  Next -->|external return route| EPA
-  EPA --> NFW
-  NFW --> WorkloadA
-```
+A workload route table in each AZ sends its default route to the endpoint from
+the same AZ key. Post-firewall and return routes remain external; they must
+return the reverse flow through that same endpoint before the packet reaches
+the workload.
+
 
 | Resource | Owner |
 |---|---|

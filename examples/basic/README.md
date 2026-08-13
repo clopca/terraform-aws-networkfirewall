@@ -11,15 +11,11 @@ terraform plan
 
 ## Forward and return path
 
-```mermaid
-flowchart LR
-  Source[Source subnet] -->|externally owned forward route| EPA[Firewall endpoint A]
-  EPA --> NFW[Network Firewall]
-  NFW --> Destination[Destination path]
-  Destination -->|externally owned return route| EPA
-  EPA --> NFW
-  NFW --> Source
-```
+A source-subnet route must select the endpoint in its own AZ. After inspection,
+an externally owned route sends allowed traffic to the destination. The return
+path must select the same AZ-local endpoint before reaching the source; this
+example creates none of those routes.
+
 
 This example creates no routes or logging. Before apply, review Network Firewall
 endpoint and dual-stack charges. After apply, wait for both AZ attachments,

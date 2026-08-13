@@ -13,23 +13,11 @@ spoke routes already exist.
 
 ## Architecture and traffic
 
-```mermaid
-flowchart LR
-  SpokeA[Spoke A] --> TGW[Transit Gateway appliance mode]
-  TGW -->|forward to inspection attachment AZ A| AttachRTA[TGW attachment RT A]
-  AttachRTA --> EPA[Firewall endpoint A]
-  EPA --> NFW[Network Firewall]
-  NFW --> FwRTA[Firewall subnet RT A]
-  FwRTA -->|destination spoke CIDR| TGW
-  TGW --> SpokeB[Spoke B]
-  SpokeB -->|return| TGW
-  TGW --> AttachRTA
-  AttachRTA --> EPA
-  EPA --> NFW
-  NFW --> FwRTA
-  FwRTA --> TGW
-  TGW --> SpokeA
-```
+Spoke traffic arrives through the TGW attachment in the selected appliance-mode
+AZ, follows the attachment-subnet route to the AZ-local firewall endpoint, and
+returns from the firewall subnet to the TGW for the destination spoke. The
+reverse flow follows the same TGW attachment and endpoint AZ.
+
 
 The route shape is repeated per AZ. TGW appliance mode preserves the selected
 inspection AZ for the life of the flow.
