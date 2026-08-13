@@ -356,7 +356,7 @@ Use declarative imports in the caller root when no compatible source address exi
 | `aws_route` | `ROUTE_TABLE_ID_DESTINATION`, for example `rtb-123_0.0.0.0/0`, `rtb-123_::/0`, or `rtb-123_pl-123` |
 | `aws_cloudwatch_log_group` | Exact log-group name |
 
-An injected data source cannot move to a managed resource. Remove the data address and import the physical resource at its final managed address. A cross-state handoff always uses a `removed` block with nested `lifecycle { destroy = false }` in the old state plus `import` in the new state.
+An injected data source cannot move to a managed resource. Remove the data address and import the physical resource at its final managed address. A cross-state handoff always uses a `removed` block with nested `lifecycle { destroy = false }` in the old state plus `import` in the new state. The old-state plan reports this non-destructive handoff as `forget`; approve that exact action and address in the acceptance file.
 
 ## 7. Acceptance gate
 
@@ -377,11 +377,12 @@ shasum -a 256 "$guard"
 
 For a registry install the usual path is `.terraform/modules/nfw/scripts/check-migration-plan.sh`; resolving `modules.json` avoids guessing. Compare the SHA-256 with the file in the pinned module release before execution.
 
-The first gate always rejects delete/replacement. It also rejects create/update except new `terraform_data` checks. If review explicitly approves a non-destructive action, list the exact action and full address in a separate file:
+The first gate always rejects delete/replacement. It also rejects create/update/forget except new `terraform_data` checks. If review explicitly approves a non-destructive action, list the exact action and full address in a separate file:
 
 ```text
 # approved-actions.txt
 update module.nfw_logging.aws_networkfirewall_logging_configuration.this["primary"]
+forget module.legacy.terraform_data.handoff["primary"]
 ```
 
 Then rerun:
@@ -390,7 +391,7 @@ Then rerun:
 "$guard" v1-to-v2.tfplan approved-actions.txt
 ```
 
-The script runs `terraform show -json`, rejects every action list containing `delete` (including replacements), and separately rejects every non-allowlisted `create` or `update` except new `terraform_data` checks. Output-ID assertions in native state fixtures are supplementary; they are not the acceptance gate.
+The script runs `terraform show -json`, rejects every action list containing `delete` (including replacements), and separately rejects every non-allowlisted `create`, `update`, or `forget`. The only automatic create exception is a resource whose structurally parsed type is `terraform_data`; a module label named `terraform_data` does not qualify. A `forget` from `removed { lifecycle { destroy = false } }` is accepted only through an exact action/address approval. Output-ID assertions in native state fixtures are supplementary; they are not the acceptance gate.
 
 Reject the migration plan if it contains any unapproved action beyond state moves and new `terraform_data` checks. In particular, require:
 
