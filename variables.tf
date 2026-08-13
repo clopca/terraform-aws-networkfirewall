@@ -16,9 +16,10 @@ variable "firewalls" {
         # Keys are caller-declared AWS Availability Zone names. Plan-time checks
         # reject duplicate known AZ IDs, but cannot query unknown subnet metadata.
         endpoint_subnets = map(object({
-          subnet_id                    = string
-          availability_zone_id         = optional(string)
-          ip_address_type              = optional(string, "IPV4")
+          subnet_id            = string
+          availability_zone_id = optional(string)
+          ip_address_type      = optional(string, "IPV4")
+          # Prefer literal true. A computed unknown value defers this precondition to apply.
           address_family_migration_ack = optional(bool, false)
         }))
       }))

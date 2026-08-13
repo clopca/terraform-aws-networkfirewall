@@ -77,7 +77,7 @@ Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc
 | Physical endpoint replacement | endpoint `subnet_id`, `ip_address_type` | Keeps the firewall ARN but replaces the `vpce-*`; update routes only after the replacement endpoint is ready. |
 | Mutable | policy ARN, protections, description, analysis types, customer KMS, tags | Updates in place, with service-specific dataplane impact. |
 
-AWS does not support changing a subnet mapping's address family in place. Every new `IPV6` or `DUALSTACK` mapping therefore requires `address_family_migration_ack = true`; this is a plan-known acknowledgement that the mapping is new or part of a reviewed blue/green cutover, not permission to mutate an existing endpoint casually. Use a new firewall key, wait for readiness, cut routes over by AZ, and retire the old firewall.
+AWS does not support changing a subnet mapping's address family in place. Every new `IPV6` or `DUALSTACK` mapping therefore requires `address_family_migration_ack = true`; supply a literal `true` to acknowledge that the mapping is new or part of a reviewed blue/green cutover, not to authorize a casual in-place mutation. If the boolean is computed and unknown during plan, Terraform defers this precondition until apply; the module cannot force an unknown value to fail at plan time. Use a new firewall key, wait for readiness, cut routes over by AZ, and retire the old firewall.
 
 Known `availability_zone_id` values must be unique across `endpoint_subnets`. Terraform cannot prove a subnet's real VPC/AZ when those handles are unknown at plan time, so AWS remains the authority for unresolved subnet metadata.
 
