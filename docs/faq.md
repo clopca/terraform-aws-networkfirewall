@@ -4,7 +4,7 @@
 
 No. It creates or observes Network Firewall resources and endpoint mappings. VPC
 v5 can own the VPC/subnets/route tables, and routes must be composed explicitly.
-See [VPC v5 composition](VPC-V5-COMPOSITION.md).
+See [VPC v5 composition](vpc-v5-composition.md).
 
 ## Does creating a firewall redirect traffic automatically?
 
@@ -40,7 +40,7 @@ by a create-resource dependency.
 
 Use Tier 1 root outputs and named stable submodule outputs. The
 `aws_network_firewall` v1 bridge is deprecated and removed in v3. `resources` is
-an unsupported provider-shape escape hatch. See [how to use outputs](how-to-use-outputs.md).
+an unsupported provider-shape escape hatch. See [how to use outputs](outputs.md).
 
 ## Should I use VPC v5 native routes or `modules/routes`?
 

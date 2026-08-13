@@ -1,4 +1,4 @@
-# Compose with AWS IA VPC v5
+# VPC v5 composition
 
 AWS IA VPC v5 and Network Firewall v2 compose through stable AZ-keyed maps. VPC
 v5 owns network primitives; Network Firewall owns endpoint mappings; one route
@@ -37,7 +37,7 @@ The firewall returns:
 Keep AZ names as map keys from subnet creation through route creation. Never
 flatten endpoint IDs into a list.
 
-## Placement
+## Firewall placement
 
 ```hcl
 module "vpc" {
@@ -160,7 +160,7 @@ The acknowledgement confirms that the route table is external to this
 submodule and that no other state owns each route-table/destination pair. The
 bridge does not import or inspect route ownership.
 
-## Forward and return path
+## Forward and return routing
 
 For outbound traffic in each AZ, the application route table sends the default
 route to its AZ-local firewall endpoint. Allowed traffic leaves the firewall

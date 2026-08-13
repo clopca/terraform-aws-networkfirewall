@@ -1,96 +1,97 @@
-# Documentation
+# Network Firewall module documentation
 
-Use the shortest path that matches your task. The root module owns firewall
-placement and lifecycle. Add public submodules only for the resources whose
-ownership you want in the same Terraform state.
+Use these guides to choose and compose the v2 contracts. The root
+[README](../README.md) remains the starting point for installation, the quick
+start, cost guidance, and example selection.
 
-## Learning paths
+## Contract guides
 
-### Evaluator
+| Guide | Use it for |
+| --- | --- |
+| [VPC v5 composition](vpc-v5-composition.md) | Firewall subnet placement, AZ-local endpoints, native VPC v5 routes, external route tables, symmetric forward and return paths, and readiness. |
+| [Rule management](rule-management.md) | Terraform-owned, AWS-managed, and dynamic SecOps rule groups; source lanes; typed sets; evidence; and policy composition. |
+| [Policy control](policy-control.md) | Immutable policy releases, observation/selective/enforce behavior, managed and customer group differences, incident overrides, and rollback. |
+| [Security and operations](security-and-operations.md) | Firewall protections, logging ownership, readiness, monitoring, change controls, and the operational runbook map. |
+| [Outputs](outputs.md) | Stable Tier 1 composition, the temporary Tier 2 v1 bridge, submodule handles, and the Tier 3 escape hatch. |
+| [Troubleshooting](troubleshooting.md) | Initialization, placement, readiness, routing, rule, policy, logging, and migration failures. |
+| [FAQ](faq.md) | Short answers about ownership, endpoint identity, observation behavior, outputs, and validation boundaries. |
 
-1. Read the root [README](../README.md), especially ownership and cost warnings.
-2. Review [module composition](architecture/module-composition.md) and
-   [zonal traffic flow](architecture/zonal-traffic-flow.md).
-3. Compare [`basic`](../examples/basic) with
-   [`end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5).
-4. Run `terraform init -backend=false` and `terraform validate`; these checks do
-   not create AWS resources and do not prove dataplane correctness.
+## Input and module map
 
-### First deployment
+Start in the guide named in the final column, then use the generated input tables
+in the root and submodule READMEs for complete types and defaults.
 
-1. Confirm the [prerequisites and quick start](../README.md#quick-start).
-2. Start with [`basic`](../examples/basic) for an existing VPC/policy, or
-   [`end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5) for the complete path.
-3. Read [VPC v5 composition](VPC-V5-COMPOSITION.md) and
-   [how to use outputs](how-to-use-outputs.md).
-4. Plan both forward and return routes by AZ before applying.
-5. Apply in a non-production account, wait for endpoint readiness, and run
-   positive and negative traffic probes.
+| Surface | Responsibility | Guide |
+| --- | --- | --- |
+| Root `firewalls` | Create or inject firewalls, define VPC endpoint placement, protections, policy binding, encryption, analysis options, and tags. | [VPC v5 composition](vpc-v5-composition.md) |
+| `modules/logging.logging_configurations` | Own one effective logging configuration per firewall and optionally CloudWatch log groups. | [Security and operations](security-and-operations.md) |
+| `modules/routes.vpc_endpoint_ids_by_az` | Supply the stable AZ-keyed endpoint target map for external route tables. | [VPC v5 composition](vpc-v5-composition.md) |
+| `modules/routes.routes` | Own only caller-declared `aws_route` resources in external tables. | [VPC v5 composition](vpc-v5-composition.md) |
+| `modules/rule-groups.rule_groups` | Create or inject typed rule-group releases and select Terraform or external content ownership. | [Rule management](rule-management.md) |
+| `modules/policy-control.rule_group_records` | Consume typed identity and ownership metadata from the rule-group module. | [Rule management](rule-management.md) |
+| `modules/policy-control.policies` | Create or inject immutable policy releases and compile enforcement/incident posture. | [Policy control](policy-control.md) |
 
-### Production
+## Choose a task
 
-1. Select a [rule ownership model](rule-management.md) and document one owner per
-   structure, content, policy release, logging destination, and route.
-2. Use [policy releases and enforcement](policy-releases-and-enforcement.md) for
-   candidate, active, and last-known-good policies.
-3. Enable ALERT, FLOW, and TLS logging as applicable.
-4. Rehearse [promotion](operations/promote-to-enforce.md),
-   [incident rollback](operations/incident-control-and-rollback.md), and
-   [rule hotfix](operations/rule-hotfix.md) procedures.
-5. Monitor service quotas, endpoint health, dropped traffic, logging delivery,
-   and temporary-control expiry.
+| Task | Start here |
+| --- | --- |
+| Place a firewall in VPC v5 subnets | [Placement contract](vpc-v5-composition.md#firewall-placement) |
+| Route each table to the endpoint in its AZ | [Native VPC v5 routes](vpc-v5-composition.md#native-vpc-v5-routes) or [external route tables](vpc-v5-composition.md#external-route-table-bridge) |
+| Validate a symmetric egress or TGW path | [Forward and return routing](vpc-v5-composition.md#forward-and-return-routing) |
+| Choose who owns live rule content | [Rule-content ownership models](rule-management.md#rule-content-ownership-models) |
+| Pass rule metadata into a policy safely | [Typed policy composition](rule-management.md#typed-policy-composition) |
+| Promote candidate to active or roll back | [Policy release roles](policy-control.md#policy-release-roles) |
+| Use incident observation controls | [Incident-control precedence](policy-control.md#incident-control-precedence) |
+| Configure ALERT, FLOW, or TLS logs | [Logging ownership](security-and-operations.md#logging-ownership) |
+| Consume endpoint readiness safely | [Endpoint records](outputs.md#endpoint-records-and-readiness) |
+| Migrate v1 or pre-v1 state | [Upgrade guide 2.0](UPGRADE-GUIDE-2.0.md) |
 
-### Operator
+## Operations
 
-1. Start from the [operations index](operations/README.md).
-2. Use [troubleshooting](troubleshooting.md) for plan, readiness, routing, and
-   policy-control failures.
-3. Use Tier 1 and stable submodule outputs from
-   [how to use outputs](how-to-use-outputs.md); do not automate against Tier 3
-   provider-object shapes.
-4. Preserve logs during incidents and use the smallest effective rollback lever.
+The [operations index](operations/README.md) selects the runbook for the active
+change:
 
-### Migrator
+- [Promote to enforce](operations/promote-to-enforce.md) moves a validated
+  candidate through observation and selective enforcement while retaining LKG.
+- [Incident control and rollback](operations/incident-control-and-rollback.md)
+  applies the smallest effective group, stateful-wide, or policy-ARN rollback.
+- [Emergency rule hotfix](operations/rule-hotfix.md) publishes a bounded,
+  versioned rule change and integrates it into the normal release afterward.
 
-1. Read the [2.0 upgrade guide](UPGRADE-GUIDE-2.0.md) completely.
-2. Rehearse on a copied state and use
-   [`migration_pre_v1_routes`](../examples/migration_pre_v1_routes).
-3. Run `scripts/check-migration-plan.sh` against a saved plan and exact approved
-   action list.
-4. Continue only with zero delete or replace actions and expected, explicitly
-   approved create, update, or forget actions.
-5. Keep the deprecated `aws_network_firewall` bridge only as long as needed; it
-   is removed in v3.
+Use the [security and operations guide](security-and-operations.md) for the
+shared prerequisites: protections, attachment readiness, logging health,
+monitoring, plan review, and temporary-control expiry.
 
-## Task index
+## Upgrade and migration
 
-| Task | Guide |
-|---|---|
-| Understand module boundaries | [Module composition](architecture/module-composition.md) |
-| Design symmetric routing | [Zonal traffic flow](architecture/zonal-traffic-flow.md) |
-| Compose AWS IA VPC v5 | [VPC v5 composition](VPC-V5-COMPOSITION.md) |
-| Consume stable outputs | [How to use outputs](how-to-use-outputs.md) |
-| Choose rule-content ownership | [Rule management](rule-management.md) |
-| Promote or roll back a policy | [Policy releases and enforcement](policy-releases-and-enforcement.md) |
-| Operate a change or incident | [Operations runbooks](operations/README.md) |
-| Diagnose failures | [Troubleshooting](troubleshooting.md) |
-| Answer contract questions | [FAQ](faq.md) |
-| Upgrade state/configuration | [2.0 upgrade guide](UPGRADE-GUIDE-2.0.md) |
-| Review design decisions | [ADR index](adr/README.md) |
-| Contribute or report a bug | [Contribution guide](../CONTRIBUTING.md) and [issue forms](../.github/ISSUE_TEMPLATE) |
-| Report a vulnerability | [Security policy](../SECURITY.md) |
-| Review release changes | [Changelog](../CHANGELOG.md) |
+- [Upgrade guide 2.0](UPGRADE-GUIDE-2.0.md) is the sequential v1-to-v2 runbook,
+  including state moves, approval files, plan gates, stop conditions, and
+  verification.
+- [Historical 1.0 upgrade guide](UPGRADE-GUIDE-1.0.md) records the older route
+  transition needed by some pre-v1 states.
+- [`migration_pre_v1_routes`](../examples/migration_pre_v1_routes) provides the
+  complete twelve-route move catalog for copied-state rehearsal.
+- [ADR index](adr/README.md) records accepted boundaries and the one reserved,
+  unimplemented endpoint-association shape.
 
-## Contract boundaries
+## Examples
 
-- `terraform validate` proves HCL and provider-schema compatibility, not that IDs
-  exist, route tables are exclusively owned, traffic is symmetric, or AWS accepts
-  Suricata content.
-- Endpoint outputs become operationally useful only after the service reports
-  healthy attachments for every requested AZ.
-- Inject mode observes a firewall through an AWS data source. It does not adopt
-  lifecycle ownership.
-- The route bridge owns only declared `aws_route` resources; it never discovers,
-  imports, or owns route tables.
-- Terraform can validate attestation shape but cannot establish that evidence is
-  independently produced or trustworthy.
+The root [example catalog](../README.md#examples) compares all ten configurations
+by purpose, ownership, prerequisite, and validation boundary. Each example
+README follows the same structure: real contract keys, a literal differential
+configuration excerpt, prerequisites and cost when relevant, run commands, and
+a scenario-specific runtime check.
+
+Start with [`basic`](../examples/basic) for an existing VPC and policy,
+[`end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5) for the integrated path,
+or [`inject_existing_firewall`](../examples/inject_existing_firewall) when
+firewall lifecycle remains external.
+
+## Repository policies
+
+- [Contributing](../CONTRIBUTING.md) documents the complete validation commands
+  and public-contract review requirements.
+- [Security policy](../SECURITY.md) defines private vulnerability reporting and
+  sensitive-data handling.
+- [Changelog](../CHANGELOG.md) records release-level additions, changes,
+  deprecations, and removals.
