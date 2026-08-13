@@ -18,7 +18,7 @@ Rule groups support three first-class management models:
 
 Choose IaC pure for reviewed rules promoted with application releases. Choose AWS managed for AWS-maintained threat intelligence with no customer source lifecycle. Choose dynamic SecOps for high-frequency IOC/signature updates that must not wait for infrastructure releases; keep structural changes in Terraform and audit API writes separately.
 
-`source_validation` does not apply to dynamic external content. The live source and its evidence belong to the external pipeline. Terraform-owned `attested` mode requires an external manifest URI and bundle digest; deriving the expected digest from the same input file is self-attestation and is not evidence.
+`source_validation` does not apply to dynamic external content. The live source and its evidence belong to the external pipeline. Terraform-owned `attested` mode validates only that a manifest URI is non-empty and a bundle digest has the expected shape; Terraform cannot prove that the values are independent of the source expression. Evidence independence is enforced by process: publish a separate manifest with its own digest or signature, bundle digest, validation job and commit identity, and AWS context, then verify it in CI before plan/apply.
 
 ## Verification boundary
 

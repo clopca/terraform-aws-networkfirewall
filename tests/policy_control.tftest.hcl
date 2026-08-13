@@ -40,11 +40,24 @@ run "observation_uses_managed_override_and_customer_variant" {
   module { source = "./modules/policy-control" }
   assert {
     condition = (
-      output.effective_releases["release-2026-08-13-plain"].stateful_rule_groups.managed.override_action == "DROP_TO_ALERT" &&
-      output.effective_releases["release-2026-08-13-plain"].stateful_rule_groups.customer.override_action == null &&
-      output.effective_releases["release-2026-08-13-plain"].stateful_rule_groups.customer.arn == "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/customer-observe"
+      length([
+        for reference in aws_networkfirewall_firewall_policy.this["release-2026-08-13-plain"].firewall_policy[0].stateful_rule_group_reference : reference
+        if reference.resource_arn == "arn:aws:network-firewall:us-east-1:aws-managed:stateful-rulegroup/ThreatStrictOrder" && reference.priority == 100
+      ]) == 1 &&
+      length(one([
+        for reference in aws_networkfirewall_firewall_policy.this["release-2026-08-13-plain"].firewall_policy[0].stateful_rule_group_reference : reference
+        if reference.resource_arn == "arn:aws:network-firewall:us-east-1:aws-managed:stateful-rulegroup/ThreatStrictOrder" && reference.priority == 100
+      ]).override) == 1 &&
+      one(one([
+        for reference in aws_networkfirewall_firewall_policy.this["release-2026-08-13-plain"].firewall_policy[0].stateful_rule_group_reference : reference
+        if reference.resource_arn == "arn:aws:network-firewall:us-east-1:aws-managed:stateful-rulegroup/ThreatStrictOrder" && reference.priority == 100
+      ]).override).action == "DROP_TO_ALERT" &&
+      length([
+        for reference in aws_networkfirewall_firewall_policy.this["release-2026-08-13-plain"].firewall_policy[0].stateful_rule_group_reference : reference
+        if reference.resource_arn == "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/customer-observe" && reference.priority == 200 && length(reference.override) == 0
+      ]) == 1
     )
-    error_message = "Observation must use DROP_TO_ALERT only for managed groups and swap customer groups to their alert-only ARN."
+    error_message = "The rendered AWS policy must give exactly one managed reference DROP_TO_ALERT and swap the customer reference to observation_arn without overrides."
   }
 }
 
@@ -257,4 +270,89 @@ run "inject_policy_release" {
     condition     = length(aws_networkfirewall_firewall_policy.this) == 0 && output.policy_arns.existing-plain == "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/existing"
     error_message = "Injected policy releases must create nothing and return their ARN."
   }
+}
+
+
+run "typed_records_propagate_home_net" {
+  command = plan
+  module { source = "./modules/policy-control" }
+  variables {
+    rule_group_records = {
+      domains = {
+        arn                = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains"
+        type               = "STATEFUL"
+        rule_order         = "STRICT_ORDER"
+        declared_capacity  = 10
+        kind               = "customer"
+        content_management = "terraform"
+        requires_home_net  = true
+        validation_mode    = "aws_apply"
+      }
+    }
+    policies = {
+      typed-plain = {
+        name = "typed-plain", enforcement = { mode = "enforce" }, home_net_cidrs = ["10.0.0.0/8"]
+        stateful_rule_groups = {
+          domains = {
+            arn      = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains", priority = 1, kind = "customer", rule_order = "STRICT_ORDER", declared_capacity = 10
+            behavior = { actions = ["alert"], has_terminal_action = false, override_coverage = "none" }
+          }
+        }
+      }
+    }
+  }
+  assert {
+    condition     = output.effective_releases.typed-plain.stateful_rule_groups.domains.requires_home_net
+    error_message = "Matching rule_group_records must propagate requires_home_net when the policy slot omits it."
+  }
+}
+
+run "typed_records_require_home_net_without_manual_copy" {
+  command = plan
+  module { source = "./modules/policy-control" }
+  variables {
+    rule_group_records = {
+      domains = {
+        arn                = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains", type = "STATEFUL", rule_order = "STRICT_ORDER", declared_capacity = 10, kind = "customer"
+        content_management = "terraform", requires_home_net = true, validation_mode = "aws_apply"
+      }
+    }
+    policies = {
+      bad-plain = {
+        name = "bad-plain", enforcement = { mode = "enforce" }
+        stateful_rule_groups = {
+          domains = {
+            arn      = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains", priority = 1, kind = "customer", rule_order = "STRICT_ORDER", declared_capacity = 10
+            behavior = { actions = ["alert"], has_terminal_action = false, override_coverage = "none" }
+          }
+        }
+      }
+    }
+  }
+  expect_failures = [terraform_data.policy_contract["bad-plain"]]
+}
+
+run "typed_records_reject_incoherent_reference" {
+  command = plan
+  module { source = "./modules/policy-control" }
+  variables {
+    rule_group_records = {
+      domains = {
+        arn                = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains", type = "STATEFUL", rule_order = "STRICT_ORDER", declared_capacity = 10, kind = "customer"
+        content_management = "terraform", requires_home_net = false, validation_mode = "aws_apply"
+      }
+    }
+    policies = {
+      bad-plain = {
+        name = "bad-plain", enforcement = { mode = "enforce" }
+        stateful_rule_groups = {
+          domains = {
+            arn      = "arn:aws:network-firewall:us-east-1:123456789012:stateful-rulegroup/domains", priority = 1, kind = "customer", rule_order = "STRICT_ORDER", declared_capacity = 11
+            behavior = { actions = ["alert"], has_terminal_action = false, override_coverage = "none" }
+          }
+        }
+      }
+    }
+  }
+  expect_failures = [terraform_data.policy_contract["bad-plain"]]
 }

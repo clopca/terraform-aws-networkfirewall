@@ -107,7 +107,7 @@ module "network_firewall_logging" {
 
 ## Rule groups and policy control
 
-[`modules/rule-groups`](modules/rule-groups) is Suricata-first and also supports closed domain-list, native stateful, and stateless lanes. It validates required IP/port bindings, Suricata SID uniqueness/ranges, capacity, source XOR, and external attestation metadata before AWS apply.
+[`modules/rule-groups`](modules/rule-groups) is Suricata-first and also supports closed domain-list, native stateful, and stateless lanes. It validates required IP/port bindings, Suricata SID uniqueness/ranges, capacity, source XOR, and attestation shape before AWS apply; manifest independence must be enforced by CI.
 
 AWS supports three operational ownership models, all first-class here:
 

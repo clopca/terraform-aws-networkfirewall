@@ -17,9 +17,22 @@ locals {
     ])
   }
 
-  sid_values = {
+  suricata_active_lines = {
     for key, group in var.rule_groups : key => [
-      for sid in flatten(regexall("(?i)sid\\s*:\\s*([0-9]+)\\s*;", try(group.source.rules_string, null) == null ? "" : group.source.rules_string)) : tonumber(sid)
+      for line in split("\n", try(group.source.rules_string, null) == null ? "" : group.source.rules_string) : line
+      if length(regexall("^\\s*#", line)) == 0
+    ]
+  }
+  suricata_scan_text = {
+    for key, lines in local.suricata_active_lines : key => replace(
+      join("\n", lines),
+      "/\"(?:\\\\.|[^\"\\\\])*\"/",
+      "\"\"",
+    )
+  }
+  sid_values = {
+    for key, rules_string in local.suricata_scan_text : key => [
+      for sid in flatten(regexall("(?i)sid\\s*:\\s*([0-9]+)\\s*;", rules_string)) : tonumber(sid)
     ]
   }
 
@@ -134,7 +147,7 @@ resource "terraform_data" "rule_group_contract" {
         try(trimspace(each.value.source_validation.manifest_uri), "") != "" &&
         can(regex("^[0-9a-fA-F]{64}$", try(each.value.source_validation.bundle_sha256, "")))
       )
-      error_message = "Attested rule group '${each.key}' requires an external manifest_uri and a 64-character bundle_sha256; do not self-attest with filesha256 of the same source file."
+      error_message = "Attested rule group '${each.key}' requires a non-empty manifest_uri and a 64-character bundle_sha256. Terraform validates shape only; manifest independence must be enforced by CI."
     }
 
     precondition {

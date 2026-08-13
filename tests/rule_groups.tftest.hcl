@@ -234,3 +234,49 @@ run "reject_invalid_injected_metadata" {
   variables { rule_groups = { bad = { create = false, arn = "arn:example", metadata = { type = "STATEFUL", rule_order = "DEFAULT_ACTION_ORDER", declared_capacity = 0, kind = "customer" } } } }
   expect_failures = [terraform_data.rule_group_contract["bad"]]
 }
+
+
+run "ignore_commented_suricata_sid" {
+  command = plan
+  module { source = "./modules/rule-groups" }
+  variables {
+    rule_groups = {
+      comments = {
+        name = "comments", type = "STATEFUL", capacity = 10
+        source = { rules_string = <<-RULES
+          # retired rule sid:11;
+          alert ip any any -> any any (msg:"active"; sid:11;)
+        RULES
+        }
+        sid_range         = { min = 11, max = 11 }
+        source_validation = { mode = "aws_apply" }
+      }
+    }
+  }
+  assert {
+    condition     = length(aws_networkfirewall_rule_group.terraform_content) == 1
+    error_message = "A sid in a full-line Suricata comment must not count as an active SID."
+  }
+}
+
+run "ignore_suricata_sid_inside_quoted_message" {
+  command = plan
+  module { source = "./modules/rule-groups" }
+  variables {
+    rule_groups = {
+      messages = {
+        name = "messages", type = "STATEFUL", capacity = 10
+        source = { rules_string = <<-RULES
+          alert ip any any -> any any (msg:"literal sid:41;"; sid:42;)
+        RULES
+        }
+        sid_range         = { min = 42, max = 42 }
+        source_validation = { mode = "aws_apply" }
+      }
+    }
+  }
+  assert {
+    condition     = length(aws_networkfirewall_rule_group.terraform_content) == 1
+    error_message = "A sid-like token inside a quoted Suricata option must not count as an active SID."
+  }
+}

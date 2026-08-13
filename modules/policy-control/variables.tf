@@ -1,3 +1,24 @@
+variable "rule_group_records" {
+  description = "Optional output from modules/rule-groups. Records are matched to policy slots by ARN to propagate requires_home_net and validate declared kind, rule order, and capacity. Unmatched external ARNs remain caller attestations."
+  nullable    = false
+  type = map(object({
+    arn                = string
+    type               = string
+    rule_order         = string
+    declared_capacity  = number
+    kind               = string
+    content_management = string
+    requires_home_net  = bool
+    validation_mode    = string
+  }))
+  default = {}
+
+  validation {
+    condition     = length(distinct([for record in values(var.rule_group_records) : record.arn])) == length(var.rule_group_records)
+    error_message = "rule_group_records must contain unique ARNs so each policy reference has one metadata authority."
+  }
+}
+
 variable "policies" {
   description = "Caller-keyed immutable policy releases. Keys end in -plain or -tls and are state identity; rule-group references bind ARNs and declared metadata, never content."
   nullable    = false
@@ -34,7 +55,7 @@ variable "policies" {
       rule_order             = string
       declared_capacity      = number
       enforce_from           = optional(string, "enforce")
-      requires_home_net      = optional(bool, false)
+      requires_home_net      = optional(bool)
       deep_threat_inspection = optional(string)
       behavior = object({
         actions             = set(string)

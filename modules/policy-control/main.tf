@@ -6,6 +6,40 @@ locals {
   }
   blocking_actions = toset(["drop", "reject"])
 
+  rule_group_records_by_arn = {
+    for record_key, record in var.rule_group_records : record.arn => merge(record, { record_key = record_key })
+  }
+
+  effective_requires_home_net = {
+    for policy_key, policy in var.policies : policy_key => {
+      for group_key, reference in policy.stateful_rule_groups : group_key => coalesce(
+        reference.requires_home_net,
+        try(local.rule_group_records_by_arn[reference.arn].requires_home_net, null),
+        false,
+      )
+    }
+  }
+
+  stateful_duplicate_priorities = {
+    for policy_key, policy in var.policies : policy_key => {
+      for priority in distinct([for reference in values(policy.stateful_rule_groups) : reference.priority]) :
+      tostring(priority) => sort([
+        for group_key, reference in policy.stateful_rule_groups : group_key if reference.priority == priority
+      ])
+      if length([for reference in values(policy.stateful_rule_groups) : reference if reference.priority == priority]) > 1
+    }
+  }
+
+  stateless_duplicate_priorities = {
+    for policy_key, policy in var.policies : policy_key => {
+      for priority in distinct([for reference in values(policy.stateless_rule_groups) : reference.priority]) :
+      tostring(priority) => sort([
+        for group_key, reference in policy.stateless_rule_groups : group_key if reference.priority == priority
+      ])
+      if length([for reference in values(policy.stateless_rule_groups) : reference if reference.priority == priority]) > 1
+    }
+  }
+
   stateful_decisions = {
     for policy_key, policy in var.policies : policy_key => {
       for group_key, reference in policy.stateful_rule_groups : group_key => {
@@ -117,7 +151,7 @@ resource "terraform_data" "policy_contract" {
         for reference in values(each.value.stateful_rule_groups) :
         reference.priority >= 1 && reference.priority <= 65535 && floor(reference.priority) == reference.priority
       ]) && length(distinct([for reference in values(each.value.stateful_rule_groups) : reference.priority])) == length(each.value.stateful_rule_groups)
-      error_message = "Policy release '${each.key}' stateful priorities must be unique integers from 1 through 65535."
+      error_message = "Policy release '${each.key}' stateful priorities must be unique integers from 1 through 65535. Duplicates: ${join("; ", [for priority, group_keys in local.stateful_duplicate_priorities[each.key] : "${priority} => [${join(", ", group_keys)}]"])}."
     }
 
     precondition {
@@ -125,7 +159,7 @@ resource "terraform_data" "policy_contract" {
         for reference in values(each.value.stateless_rule_groups) :
         reference.priority >= 1 && reference.priority <= 65535 && floor(reference.priority) == reference.priority
       ]) && length(distinct([for reference in values(each.value.stateless_rule_groups) : reference.priority])) == length(each.value.stateless_rule_groups)
-      error_message = "Policy release '${each.key}' stateless priorities must be unique integers from 1 through 65535."
+      error_message = "Policy release '${each.key}' stateless priorities must be unique integers from 1 through 65535. Duplicates: ${join("; ", [for priority, group_keys in local.stateless_duplicate_priorities[each.key] : "${priority} => [${join(", ", group_keys)}]"])}."
     }
 
     precondition {
@@ -160,6 +194,20 @@ resource "terraform_data" "policy_contract" {
     precondition {
       condition = alltrue([
         for reference in values(each.value.stateful_rule_groups) :
+        !contains(keys(local.rule_group_records_by_arn), reference.arn) || (
+          local.rule_group_records_by_arn[reference.arn].type == "STATEFUL" &&
+          reference.kind == local.rule_group_records_by_arn[reference.arn].kind &&
+          reference.rule_order == local.rule_group_records_by_arn[reference.arn].rule_order &&
+          reference.declared_capacity == local.rule_group_records_by_arn[reference.arn].declared_capacity &&
+          (reference.requires_home_net == null || reference.requires_home_net == local.rule_group_records_by_arn[reference.arn].requires_home_net)
+        )
+      ])
+      error_message = "Policy release '${each.key}' has a stateful reference inconsistent with matching rule_group_records metadata (type, kind, rule_order, declared_capacity, or explicitly declared requires_home_net)."
+    }
+
+    precondition {
+      condition = alltrue([
+        for reference in values(each.value.stateful_rule_groups) :
         length(reference.behavior.actions) > 0 &&
         length(setsubtract(reference.behavior.actions, toset(["alert", "drop", "reject", "pass"]))) == 0 &&
         contains(["all_blocking", "drop_only", "none"], reference.behavior.override_coverage) &&
@@ -186,12 +234,12 @@ resource "terraform_data" "policy_contract" {
         !local.stateful_decisions[each.key][group_key].blocking ||
         try(trimspace(reference.observation_arn), "") != ""
       ])
-      error_message = "Policy release '${each.key}' would observe a blocking customer group without observation_arn. Supply an independently validated alert-only observation_arn, or raise enforce_from/force_enforce so the customer group remains enforcing. DROP_TO_ALERT is managed-only."
+      error_message = "Policy release '${each.key}' would observe a blocking customer group without observation_arn. Supply an independently validated alert-only observation_arn, raise enforcement.mode to the slot threshold, lower enforce_from deliberately, or use an incident force_enforce override. DROP_TO_ALERT is managed-only."
     }
 
     precondition {
       condition = !anytrue([
-        for reference in values(each.value.stateful_rule_groups) : reference.requires_home_net
+        for group_key, reference in each.value.stateful_rule_groups : local.effective_requires_home_net[each.key][group_key]
         ]) || (
         each.value.home_net_cidrs != null && length(each.value.home_net_cidrs) > 0
       )
@@ -325,6 +373,7 @@ locals {
           override_action   = local.stateful_decisions[policy_key][group_key].observe && local.stateful_decisions[policy_key][group_key].blocking && reference.kind == "managed" ? "DROP_TO_ALERT" : null
           behavior          = reference.behavior
           declared_capacity = reference.declared_capacity
+          requires_home_net = local.effective_requires_home_net[policy_key][group_key]
         }
       }
       stateless_rule_groups = policy.stateless_rule_groups

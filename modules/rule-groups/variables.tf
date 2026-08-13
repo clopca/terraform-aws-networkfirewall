@@ -1,5 +1,5 @@
 variable "rule_groups" {
-  description = "Caller-keyed rule-group releases. Created groups use exactly one closed source lane; injected groups require declared metadata because the AWS provider has no rule-group data source."
+  description = "Caller-keyed rule-group releases. Created groups use exactly one closed source lane; injected groups require declared metadata because the AWS provider has no rule-group data source. Attested source validation is shape-only; independent evidence is a CI/process guarantee."
   nullable    = false
   type = map(object({
     create             = optional(bool, true)

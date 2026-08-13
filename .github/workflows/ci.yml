@@ -82,6 +82,9 @@ jobs:
       - name: Run Terraform-native tests
         run: terraform test -no-color
 
+      - name: Mutation-test managed-only policy overrides
+        run: ./scripts/test-policy-managed-override-mutation.sh
+
       - name: Mutation-test product moved blocks
         run: ./scripts/test-product-moved-mutation.sh
 
