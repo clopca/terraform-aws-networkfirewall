@@ -12,7 +12,7 @@ if [[ ! -f "$plan_path" ]]; then
   exit 2
 fi
 
-if [[ "$plan_path" == *.json ]]; then
+if [[ "$plan_path" == *.json ]] || [[ "$(head -c 1 "$plan_path")" == "{" ]]; then
   cat "$plan_path"
 else
   terraform show -json "$plan_path"

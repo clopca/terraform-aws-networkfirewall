@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-safe_plan="$(mktemp /tmp/nfw-safe-plan.XXXXXX.json)"
-unsafe_plan="$(mktemp /tmp/nfw-unsafe-plan.XXXXXX.json)"
+safe_plan="$(mktemp /tmp/nfw-safe-plan.XXXXXX)"
+unsafe_plan="$(mktemp /tmp/nfw-unsafe-plan.XXXXXX)"
 
 cat >"$safe_plan" <<'JSON'
 {"resource_changes":[{"address":"aws_route.safe","change":{"actions":["update"]}},{"address":"terraform_data.new","change":{"actions":["create"]}}]}
