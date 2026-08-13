@@ -40,8 +40,26 @@ jobs:
         with:
           tflint_version: v0.63.1
 
+      - name: Set up terraform-docs 0.24.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            arm64) terraform_docs_arch="arm64" ;;
+            x86_64) terraform_docs_arch="amd64" ;;
+            *) echo "Unsupported runner architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          terraform_docs_url="https://github.com/terraform-docs/terraform-docs/releases/download/v0.24.0/terraform-docs-v0.24.0-darwin-${terraform_docs_arch}.tar.gz"
+          curl --fail --location --silent --show-error "${terraform_docs_url}" \
+            --output "${RUNNER_TEMP}/terraform-docs.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/terraform-docs.tar.gz" -C "${RUNNER_TEMP}" terraform-docs
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
       - name: Check formatting
         run: terraform fmt -check -recursive
+
+      - name: Check generated documentation and quick start
+        run: ./scripts/check-docs.sh
 
       - name: Check public contracts
         run: ./scripts/check-contract.sh
