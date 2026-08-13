@@ -74,13 +74,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for example in basic complete_logging rule_groups_suricata policy_control_gate; do
+          for example in basic complete_logging rule_groups_suricata policy_control_gate migration_pre_v1_routes; do
             terraform -chdir="examples/${example}" init -backend=false -lockfile=readonly
             terraform -chdir="examples/${example}" validate -no-color
           done
 
       - name: Run Terraform-native tests
         run: terraform test -no-color
+
+      - name: Mutation-test product moved blocks
+        run: ./scripts/test-product-moved-mutation.sh
 
       - name: Verify clean archive
         shell: bash
