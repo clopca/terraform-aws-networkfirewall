@@ -84,8 +84,49 @@ run "create_dual_stack_firewall" {
     )
     error_message = "All create-mode protections must default to true."
   }
+
+  assert {
+    condition = (
+      output.firewall_arns.primary == "arn:aws:network-firewall:us-east-1:123456789012:firewall/mock" &&
+      output.endpoint_records_by_firewall_by_zone.primary["us-east-1a"].subnet_id == "subnet-0123456789abcdef0" &&
+      output.endpoint_records_by_firewall_by_zone.primary["us-east-1a"].status == null &&
+      output.aws_network_firewall.id == "firewall-mock-id" &&
+      output.resources.firewalls["primary"].id == "firewall-mock-id"
+    )
+    error_message = "Tier 1 handles, the Tier 2 primary bridge, and Tier 3 resources must retain their documented shapes."
+  }
 }
 
+
+run "plan_all_endpoint_address_families" {
+  command = plan
+
+  variables {
+    firewalls = {
+      families = {
+        name       = "address-families"
+        policy_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/families"
+        placement = {
+          vpc = {
+            vpc_id = "vpc-0123456789abcdef0"
+            endpoint_subnets = {
+              ipv4 = { subnet_id = "subnet-11111111111111111", ip_address_type = "IPV4" }
+              ipv6 = { subnet_id = "subnet-22222222222222222", ip_address_type = "IPV6" }
+              dual = { subnet_id = "subnet-33333333333333333", ip_address_type = "DUALSTACK" }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition = toset([
+      for mapping in aws_networkfirewall_firewall.this["families"].subnet_mapping : mapping.ip_address_type
+    ]) == toset(["IPV4", "IPV6", "DUALSTACK"])
+    error_message = "IPV4, IPV6, and DUALSTACK endpoint mappings must all remain first-class."
+  }
+}
 run "inject_firewall_by_arn" {
   command = apply
 

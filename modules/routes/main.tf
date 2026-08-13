@@ -10,6 +10,11 @@ resource "terraform_data" "route_contract" {
     }
 
     precondition {
+      condition     = each.value.acknowledge_external_route_table
+      error_message = "Route '${each.key}' targets an externally owned route table. Set acknowledge_external_route_table=true after confirming this module is the only owner of that route-table/destination entry."
+    }
+
+    precondition {
       condition     = contains(keys(var.endpoint_ids_by_zone), each.value.endpoint_zone_key)
       error_message = "Route '${each.key}' references endpoint_zone_key '${each.value.endpoint_zone_key}', which is absent from endpoint_ids_by_zone. Add that zone or correct the route."
     }

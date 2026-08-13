@@ -9,8 +9,9 @@ variable "routes" {
   nullable    = false
 
   type = map(object({
-    route_table_id    = string
-    endpoint_zone_key = string
+    route_table_id                   = string
+    endpoint_zone_key                = string
+    acknowledge_external_route_table = optional(bool, false)
     destination = object({
       ipv4_cidr      = optional(string)
       ipv6_cidr      = optional(string)

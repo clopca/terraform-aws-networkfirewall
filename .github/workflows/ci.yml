@@ -1,0 +1,82 @@
+name: v2 Terraform CI
+
+on:
+  pull_request:
+    paths:
+      - "**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "**"
+      - ".github/workflows/ci.yml"
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  quality:
+    name: fmt, TFLint, validate, and test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform 1.15.8
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Set up TFLint 0.63.1
+        uses: terraform-linters/setup-tflint@v5
+        with:
+          tflint_version: v0.63.1
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Check public contracts
+        run: ./scripts/check-contract.sh
+
+      - name: Initialize TFLint plugins
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint --recursive
+
+      - name: Initialize module
+        run: terraform init -backend=false -lockfile=readonly
+
+      - name: Validate module
+        run: terraform validate -no-color
+
+      - name: Validate examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          for example in basic complete_logging; do
+            terraform -chdir="examples/${example}" init -backend=false -lockfile=readonly
+            terraform -chdir="examples/${example}" validate -no-color
+          done
+
+      - name: Run Terraform-native tests
+        run: terraform test -no-color
+
+      - name: Verify clean archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir="$(mktemp -d)"
+          trap 'rm -rf "$archive_dir"' EXIT
+          git archive --format=tar HEAD | tar -xf - -C "$archive_dir"
+          terraform -chdir="$archive_dir" init -backend=false -lockfile=readonly
+          terraform -chdir="$archive_dir" validate -no-color
+          terraform -chdir="$archive_dir" test -no-color

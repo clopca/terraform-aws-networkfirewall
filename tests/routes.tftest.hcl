@@ -18,19 +18,22 @@ run "plan_ipv4_and_ipv6_routes" {
     }
     routes = {
       app-a-default-v4 = {
-        route_table_id    = "rtb-01111111111111111"
-        endpoint_zone_key = "us-east-1a"
-        destination       = { ipv4_cidr = "0.0.0.0/0" }
+        route_table_id                   = "rtb-01111111111111111"
+        endpoint_zone_key                = "us-east-1a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "0.0.0.0/0" }
       }
       app-a-default-v6 = {
-        route_table_id    = "rtb-01111111111111111"
-        endpoint_zone_key = "us-east-1a"
-        destination       = { ipv6_cidr = "::/0" }
+        route_table_id                   = "rtb-01111111111111111"
+        endpoint_zone_key                = "us-east-1a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv6_cidr = "::/0" }
       }
       app-b-default-v4 = {
-        route_table_id    = "rtb-02222222222222222"
-        endpoint_zone_key = "us-east-1b"
-        destination       = { ipv4_cidr = "10.0.0.0/8" }
+        route_table_id                   = "rtb-02222222222222222"
+        endpoint_zone_key                = "us-east-1b"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "10.0.0.0/8" }
       }
     }
   }
@@ -52,9 +55,10 @@ run "reject_missing_endpoint_zone" {
     endpoint_ids_by_zone = { a = "vpce-a" }
     routes = {
       bad = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "b"
-        destination       = { ipv4_cidr = "0.0.0.0/0" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "b"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "0.0.0.0/0" }
       }
     }
   }
@@ -68,9 +72,10 @@ run "reject_multiple_route_destinations" {
     endpoint_ids_by_zone = { a = "vpce-a" }
     routes = {
       bad = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "a"
-        destination       = { ipv4_cidr = "0.0.0.0/0", ipv6_cidr = "::/0" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "0.0.0.0/0", ipv6_cidr = "::/0" }
       }
     }
   }
@@ -84,9 +89,10 @@ run "reject_invalid_destination_family" {
     endpoint_ids_by_zone = { a = "vpce-a" }
     routes = {
       bad = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "a"
-        destination       = { ipv4_cidr = "2001:db8::/64" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "2001:db8::/64" }
       }
     }
   }
@@ -100,14 +106,16 @@ run "reject_duplicate_table_destination" {
     endpoint_ids_by_zone = { a = "vpce-a", b = "vpce-b" }
     routes = {
       first = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "a"
-        destination       = { ipv4_cidr = "10.0.0.0/8" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "10.0.0.0/8" }
       }
       second = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "b"
-        destination       = { ipv4_cidr = "10.0.0.0/8" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "b"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "10.0.0.0/8" }
       }
     }
   }
@@ -121,9 +129,10 @@ run "reject_prefix_list_endpoint_target" {
     endpoint_ids_by_zone = { a = "vpce-a" }
     routes = {
       bad = {
-        route_table_id    = "rtb-1"
-        endpoint_zone_key = "a"
-        destination       = { prefix_list_id = "pl-0123456789abcdef0" }
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "a"
+        acknowledge_external_route_table = true
+        destination                      = { prefix_list_id = "pl-0123456789abcdef0" }
       }
     }
   }
@@ -137,11 +146,28 @@ run "reject_slash_in_route_key" {
     endpoint_ids_by_zone = { a = "vpce-a" }
     routes = {
       "bad/key" = {
+        route_table_id                   = "rtb-1"
+        endpoint_zone_key                = "a"
+        acknowledge_external_route_table = true
+        destination                      = { ipv4_cidr = "0.0.0.0/0" }
+      }
+    }
+  }
+  expect_failures = [terraform_data.route_contract["bad/key"]]
+}
+
+run "reject_external_route_table_without_acknowledgement" {
+  command = plan
+  module { source = "./modules/routes" }
+  variables {
+    endpoint_ids_by_zone = { a = "vpce-a" }
+    routes = {
+      bad = {
         route_table_id    = "rtb-1"
         endpoint_zone_key = "a"
         destination       = { ipv4_cidr = "0.0.0.0/0" }
       }
     }
   }
-  expect_failures = [terraform_data.route_contract["bad/key"]]
+  expect_failures = [terraform_data.route_contract["bad"]]
 }
