@@ -1,0 +1,101 @@
+name: Bug report
+description: Report a reproducible module, submodule, documentation, or migration defect.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Follow SECURITY.md and remove credentials, state, plans, account IDs, customer data, and private rule content.
+
+  - type: input
+    id: module_version
+    attributes:
+      label: Module version or commit
+      description: Exact Registry version or full commit SHA.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: terraform_version
+    attributes:
+      label: Terraform version
+      placeholder: "1.15.8"
+    validations:
+      required: true
+
+  - type: input
+    id: provider_version
+    attributes:
+      label: AWS provider version
+      placeholder: "6.60.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Root firewall module
+        - Logging submodule
+        - Routes submodule
+        - Rule-groups submodule
+        - Policy-control submodule
+        - Migration
+        - Example or documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Minimal sanitized configuration
+      description: Include stable keys and create/inject mode. Remove real IDs, ARNs, CIDRs, rule content, and secrets.
+      render: hcl
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and exact error
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include the commands run and whether the failure occurs during init, validate, plan, apply, readiness, or traffic verification.
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: Sanitized plan or relevant logs
+      description: Paste only the minimal redacted excerpt. Never attach state or a plan file containing sensitive values.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and the troubleshooting/FAQ guides.
+          required: true
+        - label: I replaced example placeholders and confirmed account/Region context.
+          required: true
+        - label: I removed credentials, state, customer data, real rule content, and sensitive identifiers.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

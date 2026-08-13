@@ -77,6 +77,9 @@ ownership you want in the same Terraform state.
 | Answer contract questions | [FAQ](faq.md) |
 | Upgrade state/configuration | [2.0 upgrade guide](UPGRADE-GUIDE-2.0.md) |
 | Review design decisions | [ADR index](adr/README.md) |
+| Contribute or report a bug | [Contribution guide](../CONTRIBUTING.md) and [issue forms](../.github/ISSUE_TEMPLATE) |
+| Report a vulnerability | [Security policy](../SECURITY.md) |
+| Review release changes | [Changelog](../CHANGELOG.md) |
 
 ## Contract boundaries
 

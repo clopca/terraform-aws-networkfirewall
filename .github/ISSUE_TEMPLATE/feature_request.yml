@@ -1,0 +1,63 @@
+name: Feature request
+description: Propose a public contract, composition, documentation, or example improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: Describe the user outcome and why the current contract cannot meet it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Proposed surface
+      options:
+        - Root firewall module
+        - Logging submodule
+        - Routes submodule
+        - Rule-groups submodule
+        - Policy-control submodule
+        - Stable output
+        - Migration
+        - Example or documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed contract or documentation
+      description: Show concise HCL or the expected learning/operations flow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: ownership
+    attributes:
+      label: Ownership and lifecycle
+      description: State who owns each resource/content boundary, ForceNew or route impact, create/inject behavior, and rollback.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: compatibility
+    attributes:
+      label: Compatibility
+      options:
+        - label: I identified caller-key/state-address impact.
+        - label: I identified whether this changes a semver-protected output.
+        - label: I identified migration and documentation requirements.
+        - label: I searched existing issues and ADRs.
+          required: true
