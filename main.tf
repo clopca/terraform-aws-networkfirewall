@@ -21,9 +21,13 @@ resource "aws_networkfirewall_firewall" "this" {
     }
   }
 
-  encryption_configuration {
-    type   = each.value.encryption.type
-    key_id = each.value.encryption.key_arn
+  dynamic "encryption_configuration" {
+    for_each = each.value.encryption.type == "CUSTOMER_KMS" ? [each.value.encryption] : []
+
+    content {
+      type   = "CUSTOMER_KMS"
+      key_id = encryption_configuration.value.key_arn
+    }
   }
 
   tags = each.value.tags

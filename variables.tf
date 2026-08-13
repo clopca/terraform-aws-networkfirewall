@@ -13,6 +13,8 @@ variable "firewalls" {
     placement = optional(object({
       vpc = optional(object({
         vpc_id = string
+        # Keys are AWS Availability Zone names (for example, us-east-1a),
+        # which enforce at most one primary subnet mapping per AZ.
         endpoint_subnets = map(object({
           subnet_id            = string
           availability_zone_id = optional(string)

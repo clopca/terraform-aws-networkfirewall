@@ -29,8 +29,8 @@ resource "terraform_data" "logging_contract" {
     }
 
     precondition {
-      condition     = !each.value.enabled || (length(each.value.logs) >= 1 && length(each.value.logs) <= 3)
-      error_message = "Enabled logging configuration '${each.key}' must contain one to three logs. Add ALERT, FLOW, or TLS entries, each at most once."
+      condition     = !each.value.manage || (length(each.value.logs) >= 1 && length(each.value.logs) <= 3)
+      error_message = "Managed logging configuration '${each.key}' must contain one to three logs. Add ALERT, FLOW, or TLS entries, each at most once."
     }
 
     precondition {
@@ -128,7 +128,7 @@ locals {
 
 resource "aws_networkfirewall_logging_configuration" "this" {
   for_each = {
-    for key, configuration in var.logging_configurations : key => configuration if configuration.enabled
+    for key, configuration in var.logging_configurations : key => configuration if configuration.manage
   }
 
   firewall_arn                = each.value.firewall_arn

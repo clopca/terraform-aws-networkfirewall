@@ -33,11 +33,21 @@ module "network_firewall" {
 }
 ```
 
-Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc`. All four firewall protections default to `true`. Inject mode uses `create = false` with `arn` and observes the firewall without taking lifecycle ownership.
+Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc`. All four firewall protections default to `true`. Inject mode uses `create = false` with `arn` and observes the firewall without taking lifecycle ownership. The normal root call uses one `firewalls.primary` entry; additional keys are for firewalls intentionally sharing the same state, account, Region, owner, and lifecycle.
+
+## Lifecycle impact
+
+| Class | Fields | Effect |
+| --- | --- | --- |
+| Immutable firewall identity | `name`, `vpc_id`, reserved `transit_gateway_id` | Replaces the Terraform firewall resource. |
+| Physical endpoint replacement | endpoint `subnet_id`, `ip_address_type` | Keeps the firewall ARN but replaces the `vpce-*`; update routes only after the replacement endpoint is ready. |
+| Mutable | policy ARN, protections, description, analysis types, customer KMS, tags | Updates in place, with service-specific dataplane impact. |
+
+AWS does not support changing a subnet mapping's address family in place. Use a blue/green firewall and cut routes over by AZ; do not treat an IPv4-to-dual-stack change as an ordinary update.
 
 ## Logging
 
-Use [`modules/logging`](modules/logging) to configure ALERT, FLOW, and TLS logs. CloudWatch log groups support create or inject; S3 buckets and Firehose delivery streams are injected.
+Use [`modules/logging`](modules/logging) to configure ALERT, FLOW, and TLS logs. CloudWatch log groups support create or inject; S3 buckets and Firehose delivery streams are injected. `manage = false` deletes the effective Network Firewall logging configuration. Changing `monitoring_dashboard` can create a logging gap because provider 6.60 removes all destinations, changes the setting, and reinstalls them.
 
 ```hcl
 module "network_firewall_logging" {
@@ -61,11 +71,11 @@ module "network_firewall_logging" {
 
 ## Routes bridge
 
-[`modules/routes`](modules/routes) creates only caller-keyed `aws_route` resources and preserves endpoint affinity with `endpoint_zone_key`. Route tables remain externally owned. IPv4 and IPv6 CIDR destinations are supported; AWS provider 6.59 rejects managed prefix-list destinations combined with Network Firewall endpoint targets, so the bridge fails closed and asks callers to expand those entries to CIDR routes.
+[`modules/routes`](modules/routes) creates only caller-keyed `aws_route` resources and preserves endpoint affinity with `availability_zone`. Route tables remain externally owned. IPv4 and IPv6 CIDR destinations are supported; AWS provider 6.59 rejects managed prefix-list destinations combined with Network Firewall endpoint targets, so the bridge fails closed and asks callers to expand those entries to CIDR routes.
 
 ## Outputs
 
-Stable outputs are `firewall_arns`, `firewall_ids`, `firewall_names`, `endpoint_ids_by_firewall_by_zone`, and `endpoint_records_by_firewall_by_zone`. The deprecated `aws_network_firewall` output is a v1 bridge for a created firewall under key `primary`. `resources` is an implementation escape hatch without a stable shape guarantee.
+Stable outputs are `firewall_arns`, `firewall_ids`, `firewall_names`, `firewall_policy_arns`, `vpc_endpoint_ids_by_firewall_by_az`, and `vpc_endpoint_records_by_firewall_by_az`. Endpoint records include AZ name, optional AZ ID, address family, and `readiness_guarantee`; they do not invent a provider resource status. The deprecated `aws_network_firewall` output is a v1 bridge for a created firewall under key `primary`. `resources` is an implementation escape hatch without a stable shape guarantee.
 
 ## Examples
 

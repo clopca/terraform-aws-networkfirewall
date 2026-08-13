@@ -1,7 +1,9 @@
 # Routes bridge module
 
-This transitional adapter creates only caller-keyed `aws_route` resources. It does not create, import, associate, or inspect route tables. Every route selects one Network Firewall endpoint through `endpoint_zone_key` and an IPv4 or IPv6 CIDR destination.
+This transitional adapter creates only caller-keyed `aws_route` resources. It does not create, import, associate, or inspect route tables. Every route selects one Network Firewall endpoint through `availability_zone` and an IPv4 or IPv6 CIDR destination.
 
 The typed contract retains `prefix_list_id`, but provider 6.59 declares it incompatible with `vpc_endpoint_id`; the module therefore fails closed with a correction to expand the list into caller-keyed CIDR routes. It never sends an invalid route to AWS.
 
 The caller remains responsible for the complete inventory and ownership of external route tables. Every route requires `acknowledge_external_route_table = true` after confirming that no other state owner manages the same route-table/destination entry. This bridge cannot prove that an unmanaged table has no conflicting route omitted from the declaration. New VPC-module integrations should prefer a native zonal endpoint target when available.
+
+`route_table_id` plus the selected destination are the physical route identity and are ForceNew. `availability_zone` selects a `vpc_endpoint_id` target; changing that target is mutable and the provider uses EC2 `ReplaceRoute`.

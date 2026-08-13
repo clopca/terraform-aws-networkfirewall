@@ -10,4 +10,4 @@ Every public collection is a map keyed by a caller-controlled identifier. Keys u
 
 The v1 singleton firewall moves from `aws_networkfirewall_firewall.anfw` to `aws_networkfirewall_firewall.this["primary"]`. Logging and route migrations depend on the caller's selected semantic keys, so the upgrade guide provides explicit address mappings instead of unsafe wildcard moves.
 
-Endpoint output zone keys always originate in `firewalls[*].placement.vpc.endpoint_subnets`. Inject mode intentionally returns an empty endpoint map because its contract accepts an ARN only and does not invent identity from provider status.
+VPC endpoint output AZ keys always originate in `firewalls[*].placement.vpc.endpoint_subnets`, whose keys must be AWS Availability Zone names. Inject mode may supply the same placement object as observation-only metadata; it is checked against the data source and is never sent to a managed resource. Without that metadata, inject mode returns an empty endpoint map rather than inventing identity from provider status.

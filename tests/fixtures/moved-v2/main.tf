@@ -24,10 +24,6 @@ resource "aws_networkfirewall_firewall" "this" {
     subnet_id       = "subnet-0123456789abcdef0"
     ip_address_type = "IPV4"
   }
-
-  encryption_configuration {
-    type = "AWS_OWNED_KMS_KEY"
-  }
 }
 
 module "logging" {
@@ -49,11 +45,11 @@ module "logging" {
 module "routes" {
   source = "../../../modules/routes"
 
-  endpoint_ids_by_zone = { "us-east-1a" = "vpce-0123456789abcdef0" }
+  vpc_endpoint_ids_by_az = { "us-east-1a" = "vpce-0123456789abcdef0" }
   routes = {
     public-a-default-v4 = {
       route_table_id                   = "rtb-0123456789abcdef0"
-      endpoint_zone_key                = "us-east-1a"
+      availability_zone                = "us-east-1a"
       acknowledge_external_route_table = true
       destination                      = { ipv4_cidr = "0.0.0.0/0" }
     }

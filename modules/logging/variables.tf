@@ -1,9 +1,9 @@
 variable "logging_configurations" {
-  description = "Logging configurations keyed by caller-controlled stable identity."
+  description = "Logging configurations keyed by caller identity. manage=false deletes the effective logging configuration. Changing monitoring_dashboard temporarily removes and reinstalls all destinations in provider 6.60."
   nullable    = false
 
   type = map(object({
-    enabled              = optional(bool, true)
+    manage               = optional(bool, true)
     firewall_arn         = string
     monitoring_dashboard = optional(bool, false)
 

@@ -46,6 +46,9 @@ jobs:
       - name: Check public contracts
         run: ./scripts/check-contract.sh
 
+      - name: Check migration plan gate
+        run: ./scripts/test-migration-plan-guard.sh
+
       - name: Initialize TFLint plugins
         run: tflint --init
 
@@ -57,6 +60,15 @@ jobs:
 
       - name: Validate module
         run: terraform validate -no-color
+
+      - name: Validate public modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          for module in logging routes; do
+            terraform -chdir="modules/${module}" init -backend=false -lockfile=readonly
+            terraform -chdir="modules/${module}" validate -no-color
+          done
 
       - name: Validate examples
         shell: bash

@@ -21,9 +21,10 @@ mock_provider "aws" {
 
   mock_data "aws_networkfirewall_firewall" {
     defaults = {
-      id   = "injected-firewall-id"
-      arn  = "arn:aws:network-firewall:us-east-1:123456789012:firewall/injected"
-      name = "injected"
+      id                  = "injected-firewall-id"
+      arn                 = "arn:aws:network-firewall:us-east-1:123456789012:firewall/injected"
+      name                = "injected"
+      firewall_policy_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/injected"
       firewall_status = [{
         status                           = "READY"
         configuration_sync_state_summary = "IN_SYNC"
@@ -56,8 +57,9 @@ run "create_dual_stack_firewall" {
             vpc_id = "vpc-0123456789abcdef0"
             endpoint_subnets = {
               "us-east-1a" = {
-                subnet_id       = "subnet-0123456789abcdef0"
-                ip_address_type = "DUALSTACK"
+                subnet_id            = "subnet-0123456789abcdef0"
+                availability_zone_id = "use1-az1"
+                ip_address_type      = "DUALSTACK"
               }
             }
           }
@@ -70,7 +72,7 @@ run "create_dual_stack_firewall" {
     condition = (
       output.firewall_ids.primary == "firewall-mock-id" &&
       output.firewall_names.primary == "inspection" &&
-      output.endpoint_ids_by_firewall_by_zone.primary["us-east-1a"] == "vpce-0123456789abcdef0"
+      output.vpc_endpoint_ids_by_firewall_by_az.primary["us-east-1a"] == "vpce-0123456789abcdef0"
     )
     error_message = "Created firewalls must expose stable handles and input-derived zone keys."
   }
@@ -80,7 +82,8 @@ run "create_dual_stack_firewall" {
       aws_networkfirewall_firewall.this["primary"].delete_protection &&
       aws_networkfirewall_firewall.this["primary"].firewall_policy_change_protection &&
       aws_networkfirewall_firewall.this["primary"].subnet_change_protection &&
-      aws_networkfirewall_firewall.this["primary"].availability_zone_change_protection
+      aws_networkfirewall_firewall.this["primary"].availability_zone_change_protection &&
+      length(aws_networkfirewall_firewall.this["primary"].encryption_configuration) == 0
     )
     error_message = "All create-mode protections must default to true."
   }
@@ -88,8 +91,12 @@ run "create_dual_stack_firewall" {
   assert {
     condition = (
       output.firewall_arns.primary == "arn:aws:network-firewall:us-east-1:123456789012:firewall/mock" &&
-      output.endpoint_records_by_firewall_by_zone.primary["us-east-1a"].subnet_id == "subnet-0123456789abcdef0" &&
-      output.endpoint_records_by_firewall_by_zone.primary["us-east-1a"].status == null &&
+      output.firewall_policy_arns.primary == "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/inspection" &&
+      output.vpc_endpoint_records_by_firewall_by_az.primary["us-east-1a"].vpc_endpoint_id == "vpce-0123456789abcdef0" &&
+      output.vpc_endpoint_records_by_firewall_by_az.primary["us-east-1a"].subnet_id == "subnet-0123456789abcdef0" &&
+      output.vpc_endpoint_records_by_firewall_by_az.primary["us-east-1a"].availability_zone == "us-east-1a" &&
+      output.vpc_endpoint_records_by_firewall_by_az.primary["us-east-1a"].availability_zone_id == "use1-az1" &&
+      output.vpc_endpoint_records_by_firewall_by_az.primary["us-east-1a"].readiness_guarantee == "provider_waited" &&
       output.aws_network_firewall.id == "firewall-mock-id" &&
       output.resources.firewalls["primary"].id == "firewall-mock-id"
     )
@@ -110,9 +117,9 @@ run "plan_all_endpoint_address_families" {
           vpc = {
             vpc_id = "vpc-0123456789abcdef0"
             endpoint_subnets = {
-              ipv4 = { subnet_id = "subnet-11111111111111111", ip_address_type = "IPV4" }
-              ipv6 = { subnet_id = "subnet-22222222222222222", ip_address_type = "IPV6" }
-              dual = { subnet_id = "subnet-33333333333333333", ip_address_type = "DUALSTACK" }
+              "us-east-1a" = { subnet_id = "subnet-11111111111111111", ip_address_type = "IPV4" }
+              "us-east-1b" = { subnet_id = "subnet-22222222222222222", ip_address_type = "IPV6" }
+              "us-east-1c" = { subnet_id = "subnet-33333333333333333", ip_address_type = "DUALSTACK" }
             }
           }
         }
@@ -135,6 +142,17 @@ run "inject_firewall_by_arn" {
       external = {
         create = false
         arn    = "arn:aws:network-firewall:us-east-1:123456789012:firewall/injected"
+        placement = {
+          vpc = {
+            vpc_id = "vpc-0123456789abcdef0"
+            endpoint_subnets = {
+              "us-east-1a" = {
+                subnet_id            = "subnet-0223456789abcdef0"
+                availability_zone_id = "use1-az1"
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -144,7 +162,9 @@ run "inject_firewall_by_arn" {
       length(aws_networkfirewall_firewall.this) == 0 &&
       output.firewall_arns.external == "arn:aws:network-firewall:us-east-1:123456789012:firewall/injected" &&
       output.firewall_ids.external == "injected-firewall-id" &&
-      output.endpoint_ids_by_firewall_by_zone.external == {}
+      output.firewall_policy_arns.external == "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/injected" &&
+      output.vpc_endpoint_ids_by_firewall_by_az.external["us-east-1a"] == "vpce-0223456789abcdef0" &&
+      output.vpc_endpoint_records_by_firewall_by_az.external["us-east-1a"].readiness_guarantee == "observed_ready"
     )
     error_message = "Inject mode must read the firewall by ARN without taking lifecycle ownership."
   }
@@ -291,4 +311,58 @@ run "reject_slash_in_identity_keys" {
     }
   }
   expect_failures = [terraform_data.firewall_contract["bad/key"]]
+}
+
+run "render_customer_kms_only" {
+  command = plan
+
+  variables {
+    firewalls = {
+      kms = {
+        name       = "customer-kms"
+        policy_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/kms"
+        placement = {
+          vpc = {
+            vpc_id = "vpc-0123456789abcdef0"
+            endpoint_subnets = {
+              "us-east-1a" = { subnet_id = "subnet-0123456789abcdef0" }
+            }
+          }
+        }
+        encryption = {
+          type    = "CUSTOMER_KMS"
+          key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+        }
+      }
+    }
+  }
+
+  assert {
+    condition = (
+      length(aws_networkfirewall_firewall.this["kms"].encryption_configuration) == 1 &&
+      aws_networkfirewall_firewall.this["kms"].encryption_configuration[0].type == "CUSTOMER_KMS"
+    )
+    error_message = "Only CUSTOMER_KMS may render encryption_configuration."
+  }
+}
+
+run "reject_logical_endpoint_az_key" {
+  command = plan
+  variables {
+    firewalls = {
+      bad = {
+        name       = "bad"
+        policy_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/policy"
+        placement = {
+          vpc = {
+            vpc_id = "vpc-1"
+            endpoint_subnets = {
+              inspection = { subnet_id = "subnet-1" }
+            }
+          }
+        }
+      }
+    }
+  }
+  expect_failures = [terraform_data.firewall_contract["bad"]]
 }

@@ -179,3 +179,29 @@ run "reject_slash_in_logging_key" {
   }
   expect_failures = [terraform_data.logging_contract["bad/key"]]
 }
+
+run "do_not_manage_logging_configuration" {
+  command = plan
+
+  module { source = "./modules/logging" }
+
+  variables {
+    logging_configurations = {
+      primary = {
+        manage       = false
+        firewall_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall/inspection"
+        logs = {
+          alerts = {
+            log_type    = "ALERT"
+            destination = { s3 = { bucket_name = "network-firewall-logs" } }
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = length(aws_networkfirewall_logging_configuration.this) == 0
+    error_message = "manage=false must remove the effective Network Firewall logging configuration from ownership."
+  }
+}

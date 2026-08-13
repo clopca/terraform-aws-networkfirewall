@@ -41,6 +41,6 @@ output "firewall_arn" {
   value = module.network_firewall.firewall_arns.primary
 }
 
-output "endpoint_ids_by_zone" {
-  value = module.network_firewall.endpoint_ids_by_firewall_by_zone.primary
+output "vpc_endpoint_ids_by_az" {
+  value = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
 }

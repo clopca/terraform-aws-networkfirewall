@@ -15,8 +15,8 @@ resource "terraform_data" "route_contract" {
     }
 
     precondition {
-      condition     = contains(keys(var.endpoint_ids_by_zone), each.value.endpoint_zone_key)
-      error_message = "Route '${each.key}' references endpoint_zone_key '${each.value.endpoint_zone_key}', which is absent from endpoint_ids_by_zone. Add that zone or correct the route."
+      condition     = contains(keys(var.vpc_endpoint_ids_by_az), each.value.availability_zone)
+      error_message = "Route '${each.key}' references availability_zone '${each.value.availability_zone}', which is absent from vpc_endpoint_ids_by_az. Add that zone or correct the route."
     }
 
     precondition {
@@ -68,7 +68,7 @@ resource "aws_route" "this" {
   route_table_id              = each.value.route_table_id
   destination_cidr_block      = each.value.destination.ipv4_cidr
   destination_ipv6_cidr_block = each.value.destination.ipv6_cidr
-  vpc_endpoint_id             = lookup(var.endpoint_ids_by_zone, each.value.endpoint_zone_key, "vpce-invalid")
+  vpc_endpoint_id             = lookup(var.vpc_endpoint_ids_by_az, each.value.availability_zone, "vpce-invalid")
 
   depends_on = [terraform_data.route_contract]
 }
