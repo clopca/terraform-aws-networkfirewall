@@ -11,8 +11,9 @@ VPC and all Network Firewall composition boundaries.
   to the AZ-local NAT Gateway.
 - `routes.application_default.target.ids_by_az` sends each application default
   route to the firewall endpoint with the same AZ key.
-- `routes.public_application_return.target.ids_by_az` returns the application
-  CIDR through that same AZ-local endpoint before VPC-local delivery.
+- The two `public_application_return_*` routes cover both application subnet
+  CIDRs and return traffic through the AZ-local firewall endpoint before
+  VPC-local delivery.
 - `rule_groups.egress-v1` creates an attested, alert-only STRICT_ORDER rule
   release with `requires_home_net = true`.
 - `rule_group_records = module.rule_groups.rule_group_records` carries typed
@@ -24,8 +25,17 @@ VPC and all Network Firewall composition boundaries.
 
 In each AZ, application traffic traverses the AZ-local firewall endpoint and
 exits through the AZ-local NAT Gateway. Return traffic reaches that NAT Gateway,
-uses the application CIDR route through the same endpoint, and then follows the
-VPC local route to the workload.
+uses an exact application-subnet CIDR route through the same endpoint, and then
+follows the VPC local route to the workload.
+
+AWS requires routes more specific than the VPC local route that target a
+firewall endpoint to exactly match a subnet CIDR block. Do not aggregate adjacent
+application subnets into one return route. This requirement is validated by a
+real AWS apply; AWS rejects an aggregate that spans multiple subnets.
+
+With `netmask = 24` and `cidr_index = 10`, VPC v5 reserves six AZ slots and
+assigns the first two application subnets `10.20.60.0/24` and
+`10.20.61.0/24`.
 
 ## Relevant configuration
 
@@ -42,9 +52,17 @@ routes = {
       ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
     }
   }
-  public_application_return = {
+  public_application_return_us_east_1a = {
     from_group  = "public"
-    destination = { type = "ipv4_cidr", value = "10.20.10.0/24" }
+    destination = { type = "ipv4_cidr", value = "10.20.60.0/24" }
+    target = {
+      type      = "vpc_endpoint"
+      ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+    }
+  }
+  public_application_return_us_east_1b = {
+    from_group  = "public"
+    destination = { type = "ipv4_cidr", value = "10.20.61.0/24" }
     target = {
       type      = "vpc_endpoint"
       ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
@@ -61,6 +79,13 @@ endpoint_subnets = {
   az => { subnet_id = subnet_id }
 }
 ```
+
+## Validation evidence
+
+The end-to-end composition has been validated with a real AWS apply: inspected
+HTTP and HTTPS traffic completed successfully, a custom Suricata alert appeared
+in CloudWatch, flow evidence confirmed zonal affinity, and the converged
+configuration produced an empty subsequent plan.
 
 ## Prerequisites and cost
 

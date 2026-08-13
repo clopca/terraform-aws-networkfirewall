@@ -58,9 +58,17 @@ module "vpc" {
         ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
       }
     }
-    public_application_return = {
+    public_application_return_us_east_1a = {
       from_group  = "public"
-      destination = { type = "ipv4_cidr", value = "10.20.10.0/24" }
+      destination = { type = "ipv4_cidr", value = "10.20.60.0/24" }
+      target = {
+        type      = "vpc_endpoint"
+        ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+      }
+    }
+    public_application_return_us_east_1b = {
+      from_group  = "public"
+      destination = { type = "ipv4_cidr", value = "10.20.61.0/24" }
       target = {
         type      = "vpc_endpoint"
         ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary

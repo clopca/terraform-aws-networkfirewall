@@ -165,10 +165,15 @@ bridge does not import or inspect route ownership.
 For outbound traffic in each AZ, the application route table sends the default
 route to its AZ-local firewall endpoint. Allowed traffic leaves the firewall
 subnet through the NAT Gateway in that AZ and then the Internet Gateway. Return
-traffic reaches the same NAT Gateway, follows the application CIDR route back to
-the same firewall endpoint, and uses the VPC local route to reach the workload.
-The same sequence must exist independently in every selected AZ.
+traffic reaches the same NAT Gateway, follows an application-subnet route back
+to the same firewall endpoint, and uses the VPC local route to reach the
+workload. The same sequence must exist independently in every selected AZ.
 
+AWS requires routes more specific than the VPC local route that target a
+firewall endpoint to exactly match a subnet CIDR block. Declare one return route
+per application subnet; do not replace adjacent subnet routes with an aggregate.
+This constraint is validated by a real AWS apply, where AWS rejected an
+aggregate spanning two application subnets with `InvalidParameterValue`.
 
 The exact route tables vary by topology, but both directions must traverse the
 same firewall endpoint AZ. NAT and internet routing normally occur after
