@@ -183,21 +183,18 @@ resource "terraform_data" "firewall_contract" {
 }
 
 resource "terraform_data" "injected_endpoint_observation" {
-  for_each = {
-    for key, firewall in local.injected_firewalls : key => firewall
-    if try(firewall.placement.vpc, null) != null
-  }
+  for_each = local.injected_firewalls
 
   input = each.key
 
   lifecycle {
     precondition {
-      condition = alltrue([
+      condition = try(each.value.placement.vpc, null) == null || try(alltrue([
         for availability_zone, endpoint in each.value.placement.vpc.endpoint_subnets : anytrue([
           for sync_state in data.aws_networkfirewall_firewall.this[each.key].firewall_status[0].sync_states :
           sync_state.availability_zone == availability_zone && sync_state.attachment[0].subnet_id == endpoint.subnet_id
         ])
-      ])
+      ]), false)
       error_message = "Injected firewall '${each.key}' observation metadata does not match firewall_status. Correct each AZ/subnet pair or omit placement.vpc and accept empty endpoint outputs."
     }
   }
