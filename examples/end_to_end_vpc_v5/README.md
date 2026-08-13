@@ -1,89 +1,84 @@
 # End-to-end VPC v5 inspection
 
-This is the integrated golden path: AWS IA VPC v5 creates a two-AZ VPC,
-application/firewall/public subnets, zonal NAT Gateways, and native routes;
-Network Firewall v2 creates a rule group, immutable policy release, firewall,
-ALERT/FLOW CloudWatch logging, and AZ-keyed endpoint composition.
+This example composes AWS IA VPC v5 with a rule group, immutable policy,
+two-AZ Network Firewall, native AZ-local routes, and ALERT/FLOW CloudWatch
+logging. Use it as the complete path when one configuration owns the inspection
+VPC and all Network Firewall composition boundaries.
 
-> [!WARNING]
-> The HCL uses the future canonical `aws-ia/vpc/aws` v5 Registry source. Until
-> that release is available, `scripts/validate-examples.sh` rewrites only the VPC
-> module source/version to `tests/fixtures/vpc-v5-contract`. The fixture creates
-> no resources and proves only the documented input/output shape. Static
-> validation does not prove AWS acceptance, route symmetry, or traffic.
+## What this demonstrates
 
-All names, evidence locations, digests, account IDs, CIDRs, and Regions are
-illustrative. Replace them and complete a security review before plan or apply.
+- `subnets.firewall.routing.nat_gateway = true` sends allowed inspected traffic
+  to the AZ-local NAT Gateway.
+- `routes.application_default.target.ids_by_az` sends each application default
+  route to the firewall endpoint with the same AZ key.
+- `routes.public_application_return.target.ids_by_az` returns the application
+  CIDR through that same AZ-local endpoint before VPC-local delivery.
+- `rule_groups.egress-v1` creates an attested, alert-only STRICT_ORDER rule
+  release with `requires_home_net = true`.
+- `rule_group_records = module.rule_groups.rule_group_records` carries typed
+  identity and HOME_NET metadata into policy control.
+- `policies.active-2026-08-13-plain.enforcement.mode = "observation"` creates
+  the policy ARN bound by `firewalls.primary.policy_arn`.
+- `logging_configurations.primary.logs` enables ALERT and FLOW CloudWatch
+  destinations for the created firewall.
 
-## Architecture and traffic
+In each AZ, application traffic traverses the AZ-local firewall endpoint and
+exits through the AZ-local NAT Gateway. Return traffic reaches that NAT Gateway,
+uses the application CIDR route through the same endpoint, and then follows the
+VPC local route to the workload.
 
-In each AZ, application traffic follows the default route to the AZ-local
-firewall endpoint, traverses Network Firewall, and exits through the AZ-local
-NAT Gateway and Internet Gateway. Return traffic reaches the same NAT Gateway,
-follows the application CIDR route through the same firewall endpoint, and then
-uses the local VPC route to reach the workload.
+## Relevant configuration
 
+The complete deployable configuration is in [`main.tf`](./main.tf). The native
+forward and return route composition is the distinguishing portion:
 
-The source uses the application group's computed `/24` (`10.20.10.0/24`) for the
-more-specific public-subnet return route. Confirm actual generated CIDRs before
-apply.
+```hcl
+routes = {
+  application_default = {
+    from_group  = "application"
+    destination = { type = "ipv4_cidr", value = "0.0.0.0/0" }
+    target = {
+      type      = "vpc_endpoint"
+      ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+    }
+  }
+  public_application_return = {
+    from_group  = "public"
+    destination = { type = "ipv4_cidr", value = "10.20.10.0/24" }
+    target = {
+      type      = "vpc_endpoint"
+      ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+    }
+  }
+}
+```
 
-## Ownership
+The firewall consumes the VPC subnet map directly:
 
-| Resource | Owner in this example |
-|---|---|
-| VPC, CIDR, subnets, route tables, NAT Gateways, IGW, native routes | VPC v5 |
-| Rule-group structure/content | `modules/rule-groups` (IaC pure) |
-| Policy release and enforcement posture | `modules/policy-control` |
-| Firewall placement/endpoints | Root module |
-| ALERT/FLOW log groups and firewall logging association | `modules/logging` |
-| Independent rule validation evidence | External security release system |
-
-## Route matrix
-
-| Route-table group | Destination | Target | Direction |
-|---|---|---|---|
-| Application, each AZ | `0.0.0.0/0` | Same-AZ firewall endpoint | Forward into inspection |
-| Firewall, each AZ | `0.0.0.0/0` | Same-AZ NAT Gateway | Forward after inspection |
-| Public/NAT, each AZ | `0.0.0.0/0` | Internet Gateway | Internet egress |
-| Public/NAT, each AZ | `10.20.10.0/24` | Same-AZ firewall endpoint | Return into inspection |
-| VPC local | Application CIDR | Local | Return after inspection |
+```hcl
+endpoint_subnets = {
+  for az, subnet_id in module.vpc.subnet_ids_by_group_by_az.firewall :
+  az => { subnet_id = subnet_id }
+}
+```
 
 ## Prerequisites and cost
 
-- A published VPC v5 release or a reviewed source for evaluation.
-- AWS credentials and permissions for VPC, EC2, Network Firewall, and CloudWatch.
-- Independent rule-bundle validation evidence and reviewed `HOME_NET`.
-- Service quotas for two firewall endpoints, rule group, and policy.
+- VPC v5 must be available from the configured source. Repository validation
+  substitutes the checked-in contract fixture until the Registry release exists.
+- Replace validation evidence, account-specific values, CIDRs, and Region before
+  planning an apply.
+- Applying creates two firewall endpoints, two NAT Gateways, a rule group, a
+  policy, and CloudWatch logs, with hourly, processing, retention, and transfer
+  charges.
 
-Applying creates two billable Network Firewall endpoints, two NAT Gateways, log
-groups, and traffic/data-processing charges. `terraform init` and
-`terraform validate` create no AWS resources.
-
-## Run and verify
-
-For repository/static validation:
+## Run
 
 ```shell
-./scripts/validate-examples.sh
+../../scripts/validate-examples.sh
 ```
 
-For an actual deployment, use a copied directory with real evidence and an
-available VPC module source:
-
-```shell
-terraform init
-terraform validate
-terraform plan -out=tfplan
-```
-
-Before apply, inspect every route and expected replacement. After apply:
-
-1. Wait for both firewall attachments to report ready.
-2. Confirm ALERT and FLOW log delivery.
-3. Probe allowed outbound traffic from each AZ.
-4. Send traffic expected to match SID `4200001` and confirm the alert.
-5. Probe return traffic, DNS, identity, time sync, and management paths.
-6. Confirm no unexpected cross-AZ path.
-
-A successful static validation does not establish any of these runtime results.
+For a real deployment, run `terraform init`, `terraform validate`, and a saved
+plan from a copied configuration with an available VPC source. After apply,
+verify both endpoint attachments, log delivery, allowed and denied traffic, and
+same-AZ return paths. Static validation proves only contract compatibility.

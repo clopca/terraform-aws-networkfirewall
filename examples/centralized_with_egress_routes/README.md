@@ -1,65 +1,68 @@
-# Centralized inspection with egress routes
+# Centralized inspection with internet egress
 
-This validate-only example adds zonal NAT and Internet Gateway route legs to a
-centralized TGW inspection VPC. It demonstrates the order: TGW traffic enters a
-same-AZ firewall endpoint, inspection completes, and SNAT occurs afterward at
-the same-AZ NAT Gateway. Return traffic re-enters the same firewall endpoint
-before reaching the TGW.
+This example creates a two-AZ firewall and the VPC route legs for centralized
+TGW internet egress through existing zonal NAT Gateways and an Internet Gateway.
+Use it when the network foundation owns the inspection VPC, TGW attachment,
+subnets, gateways, and route tables while this state owns selected routes.
 
-> [!WARNING]
-> Every ID, ARN, account number, and CIDR is a placeholder. Do not apply this
-> example unchanged. Static validation does not prove route ownership, NAT/IGW
-> edge behavior, TGW appliance mode, endpoint readiness, or traffic symmetry.
+## What this demonstrates
 
-## Architecture and traffic
+- `routes_to_firewall.routes` merges TGW attachment defaults and NAT-subnet spoke
+  return routes under stable caller keys.
+- `availability_zone = az` selects the Network Firewall endpoint matching each
+  external route table's AZ.
+- `aws_route.firewall_to_nat` sends allowed outbound traffic to the AZ-local NAT
+  Gateway after inspection.
+- `aws_route.firewall_to_tgw` sends inspected return traffic for
+  `local.spoke_cidr` back to the TGW.
+- `aws_route.nat_to_internet` supplies the NAT subnet default route to the
+  existing Internet Gateway.
+- `acknowledge_external_route_table = true` asserts exclusive ownership of the
+  two endpoint-target route families.
 
 Spoke traffic arrives through the TGW attachment in the selected appliance-mode
-AZ, traverses the AZ-local firewall endpoint, and exits through the AZ-local NAT
-Gateway and Internet Gateway. Return traffic reaches that NAT Gateway, follows
-the spoke CIDR route through the same firewall endpoint, and returns through the
-TGW to the source spoke.
+AZ, traverses the AZ-local endpoint, and exits through the AZ-local NAT Gateway.
+Return traffic reaches that NAT Gateway, follows the spoke CIDR through the same
+endpoint, and returns through the TGW.
 
+## Relevant configuration
 
-The source repeats this path in both AZs. SNAT occurs after inspection on the
-forward path, and the return route sends the original spoke destination through
-inspection before TGW delivery.
+The complete deployable configuration is in [`main.tf`](./main.tf). The endpoint
+route families are the distinguishing portion:
 
-## Ownership
-
-| Resource | Owner |
-|---|---|
-| Inspection VPC, subnets, route tables, NAT Gateways, IGW | External network stack |
-| TGW, attachments, appliance mode, TGW route tables | External TGW stack |
-| Firewall and endpoints | Root module in this example |
-| TGW attachment defaults and NAT return routes to endpoints | `modules/routes` |
-| Firewall defaults to NAT and spoke returns to TGW | Direct `aws_route` resources |
-| NAT defaults to IGW | Direct `aws_route` resources |
-| Firewall policy/rules/logging | External prerequisites |
-
-## Route matrix
-
-| Table (per AZ) | Destination | Target | Direction |
-|---|---|---|---|
-| TGW attachment subnet | `0.0.0.0/0` | Same-AZ firewall endpoint | Forward into inspection |
-| Firewall subnet | `0.0.0.0/0` | Same-AZ NAT Gateway | Forward after inspection |
-| NAT/public subnet | `0.0.0.0/0` | IGW | Internet egress |
-| NAT/public subnet | `10.0.0.0/8` | Same-AZ firewall endpoint | Return into inspection |
-| Firewall subnet | `10.0.0.0/8` | TGW | Return to spoke |
-| TGW route tables | Spoke/default prefixes | Topology-specific attachments | External |
+```hcl
+routes = merge(
+  {
+    for az, route_table_id in local.tgw_attachment_route_table_ids_by_az :
+    "tgw_${replace(az, "-", "_")}_default" => {
+      route_table_id                   = route_table_id
+      destination                      = { ipv4_cidr = "0.0.0.0/0" }
+      availability_zone                = az
+      acknowledge_external_route_table = true
+    }
+  },
+  {
+    for az, route_table_id in local.nat_route_table_ids_by_az :
+    "nat_${replace(az, "-", "_")}_spoke_return" => {
+      route_table_id                   = route_table_id
+      destination                      = { ipv4_cidr = local.spoke_cidr }
+      availability_zone                = az
+      acknowledge_external_route_table = true
+    }
+  }
+)
+```
 
 ## Prerequisites and cost
 
-- Existing multi-AZ inspection VPC, zonal NAT Gateways, IGW, and route tables.
-- Existing TGW attachment with appliance mode and reviewed routing.
-- Complete, non-overlapping spoke CIDR inventory.
-- Existing firewall policy, ALERT/FLOW logging, and rollback path.
-- Exclusive route ownership and quotas for two firewall endpoints.
+- Replace every VPC, subnet, route-table, NAT, IGW, TGW, policy, and CIDR value.
+- The TGW attachment must use appliance mode; NAT Gateways must be zonal and
+  aligned with the route-table maps.
+- Confirm exclusive ownership for every route-table/destination pair.
+- Applying creates two firewall endpoints and routes. Existing NAT, TGW,
+  Network Firewall, log, processing, transfer, and cross-AZ charges can apply.
 
-Applying creates billable firewall endpoints and route changes. Existing NAT
-Gateways, TGW processing, Network Firewall processing, logs, and cross-AZ data
-transfer incur separate charges.
-
-## Run and verify
+## Run
 
 ```shell
 terraform init
@@ -67,14 +70,6 @@ terraform validate
 terraform plan -out=tfplan
 ```
 
-Replace placeholders and compare the saved plan with the route matrix. After an
-approved apply:
-
-1. confirm endpoint and TGW attachment health in both AZs;
-2. verify allowed Internet egress and observed source-NAT address;
-3. verify the return flow traverses the same endpoint AZ;
-4. test expected deny/alert traffic and log delivery;
-5. probe DNS, identity, time sync, monitoring, and management paths;
-6. check for unexpected cross-AZ charges or asymmetric resets.
-
-Static validation does not prove any dataplane result.
+After apply, verify the observed NAT source address, both endpoint attachments,
+allowed and denied flows, logging, and same-AZ return paths. Static validation
+does not prove TGW policy, route ownership, or dataplane symmetry.

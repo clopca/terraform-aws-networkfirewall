@@ -1,19 +1,68 @@
-# Policy control gate
+# Policy release and incident-control gate
 
-Creates four immutable policy releases: observation candidate, selective active, enforced last-known-good, and an incident release that observes all stateful groups except one force-enforced customer slot. The example demonstrates managed-only `DROP_TO_ALERT`, customer alert-only ARN switching, incident precedence, and candidate/active/LKG selection by ARN.
+This example creates observation candidate, selective active, enforced
+last-known-good, and incident policy releases from the same declared rule-group
+set. Use it to promote immutable policy ARNs while preserving a rollback target
+and a bounded emergency posture.
 
-The ARNs are illustrative. Supply real AWS-managed, `modules/rule-groups`, or SOC-owned external rule-group ARNs before apply.
+## What this demonstrates
 
-## Release and traffic flow
+- `policies.candidate-2026-08-13-plain.enforcement.mode = "observation"` keeps
+  eligible stateful references observable.
+- `policies.active-2026-08-12-plain.enforcement.mode = "selective"` enforces
+  slots whose `enforce_from` threshold has been reached.
+- `policies.last-known-good-2026-08-11-plain` retains an enforced rollback ARN.
+- `common_groups.managed-threats.kind = "managed"` permits managed-only
+  `DROP_TO_ALERT` behavior when observation is effective.
+- `common_groups.customer-egress.observation_arn` supplies an independently
+  validated alert-only customer variant.
+- `incident_control.mode = "observe_all_stateful"` observes all eligible
+  stateful slots while `group_overrides.customer-egress = "force_enforce"`
+  keeps one named slot enforced.
+- `change_id`, `owner`, and `expires_at` record temporary-control accountability;
+  expiry does not trigger an automatic revert.
 
-Managed and customer rule-group ARNs feed four immutable policy releases. The
-firewall binds exactly one candidate, active, last-known-good, or incident ARN;
-forward and return packets use the same selected policy, while ALERT and FLOW
-telemetry provide promotion and rollback evidence.
+The firewall binds exactly one policy ARN. Forward and return traffic use that
+same selected release; ALERT and FLOW telemetry provide promotion evidence.
 
+## Relevant configuration
 
-Managed groups can use `DROP_TO_ALERT`; blocking customer groups use their
-alert-only observation ARN. Stateless groups remain enforced. Incident expiry is
-not automatic. Validate candidate digest/evidence, retain the LKG ARN, and test
-both traffic directions before promotion. Static validation does not verify the
-illustrative ARNs, metadata attestations, policy behavior, or traffic.
+The complete deployable configuration is in [`main.tf`](./main.tf). The incident
+release is the distinguishing portion:
+
+```hcl
+incident-2026-08-13-plain = {
+  name                 = "inspection-incident-2026-08-13-plain"
+  enforcement          = { mode = "enforce" }
+  home_net_cidrs       = ["10.0.0.0/8", "192.168.0.0/16"]
+  stateful_rule_groups = local.common_groups
+  incident_control = {
+    mode            = "observe_all_stateful"
+    group_overrides = { customer-egress = "force_enforce" }
+    change_id       = "INC-12345"
+    owner           = "network-security-oncall"
+    expires_at      = "2026-08-14T03:00:00Z"
+  }
+}
+```
+
+## Prerequisites and cost
+
+- Replace the managed and customer ARNs with real, reviewed rule-group releases.
+- Validate the customer observation variant independently from enforcement
+  content.
+- Keep ALERT/FLOW logging healthy and record the active and LKG ARNs.
+- Applying creates four firewall policies and can incur policy-associated
+  service charges; this example creates no firewall endpoints.
+
+## Run
+
+```shell
+terraform init
+terraform validate
+terraform plan -out=tfplan
+```
+
+Review `effective_releases`, exercise both traffic directions, and verify the
+rollback ARN before binding a firewall. Static validation cannot verify ARN
+existence, attested metadata, or traffic behavior.

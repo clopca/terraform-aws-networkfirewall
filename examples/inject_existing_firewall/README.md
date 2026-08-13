@@ -1,58 +1,64 @@
 # Observe an existing firewall
 
-This example sets `create = false` and reads an existing AWS Network Firewall by
-ARN. It publishes normalized Tier 1 identity, policy, endpoint, and readiness
-records without adopting lifecycle ownership.
+This example reads an existing AWS Network Firewall by ARN and publishes stable
+Tier 1 identity, policy, endpoint, and readiness records. Use it when another
+state or team owns firewall lifecycle and this configuration needs a normalized
+read-only composition boundary.
 
-> [!WARNING]
-> The default ARN is a placeholder. `terraform validate` succeeds without AWS,
-> but `plan` requires a real firewall in the configured account and Region.
-> Static validation does not prove the observed firewall is ready or correctly
-> routed.
+## What this demonstrates
 
-## Architecture and traffic
+- `firewalls.primary.create = false` selects inject mode before the ARN is read.
+- `firewalls.primary.arn` identifies the externally owned firewall without
+  adopting or changing it.
+- `firewall_arns.primary`, `firewall_ids.primary`, and `firewall_names.primary`
+  expose stable scalar identity by caller key.
+- `firewall_policy_arns.primary` reports the observed policy binding without
+  taking policy ownership.
+- `vpc_endpoint_ids_by_firewall_by_az.primary` preserves AWS Availability Zone
+  names for route consumers.
+- `vpc_endpoint_records_by_firewall_by_az.primary` marks readiness as unverified
+  because a data source cannot provide create-resource attachment guarantees.
 
-An external state owns the firewall, policy binding, endpoints, and routes. This
-configuration reads the firewall ARN and publishes normalized endpoint records;
-external forward and return routes must already select the same endpoint AZ for
-the observed flow.
+External routes must already send forward and return traffic through the same
+endpoint AZ. Inject mode observes that topology; it does not validate or manage
+it.
 
+## Relevant configuration
 
-Inject mode observes configuration. Forward and return routes remain wholly
-external and must already preserve same-AZ symmetry.
+The complete deployable configuration is in [`main.tf`](./main.tf). The inject
+boundary and normalized output are the distinguishing portions:
 
-## Ownership
+```hcl
+firewalls = {
+  primary = {
+    create = false
+    arn    = var.existing_firewall_arn
+  }
+}
+```
 
-| Concern | Owner |
-|---|---|
-| Firewall lifecycle, policy binding, protections, endpoint mappings | External firewall state/team |
-| Read-only lookup and normalized outputs | This root module instance |
-| Forward/return routes | External network state/team |
-| Rule groups, policy releases, logging configuration | External unless separately composed |
-| Runtime attachment/readiness verification | Operator |
-
-## Route matrix
-
-This example creates no routes.
-
-| Route leg | Required owner | Verification |
-|---|---|---|
-| Source to same-AZ firewall endpoint | External | Route-table and flow inspection |
-| Firewall to destination | External | Route-table/TGW/NAT inspection |
-| Destination return to same-AZ endpoint | External | Reverse-flow and AZ check |
-| Firewall return to source | External | Positive/negative traffic probes |
+```hcl
+output "observed_firewall" {
+  value = {
+    arn                = module.network_firewall.firewall_arns.primary
+    id                 = module.network_firewall.firewall_ids.primary
+    name               = module.network_firewall.firewall_names.primary
+    policy_arn         = module.network_firewall.firewall_policy_arns.primary
+    endpoints_by_az    = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+    endpoint_readiness = module.network_firewall.vpc_endpoint_records_by_firewall_by_az.primary
+  }
+}
+```
 
 ## Prerequisites and cost
 
-- Existing firewall ARN and read permissions.
-- AWS credentials for plan/read.
-- External owner approval to consume endpoint outputs.
-- Documented route, policy, logging, and incident owners.
+- Replace the placeholder ARN with a firewall in the configured account and
+  Region and grant read permissions.
+- Record the external owners of the firewall, policy, rules, logging, and routes.
+- This example creates no resources, but the observed firewall continues to
+  incur endpoint and traffic-processing charges.
 
-This example creates no firewall, but reading/composing it does not eliminate the
-existing firewall's endpoint and processing charges.
-
-## Run and verify
+## Run
 
 ```shell
 terraform init
@@ -60,13 +66,6 @@ terraform validate
 terraform plan
 ```
 
-After replacing the ARN:
-
-1. confirm observed ID, name, VPC, policy ARN, and requested AZ set;
-2. check AWS `SyncStates` and attachment status directly;
-3. compare endpoint IDs with external route targets by AZ;
-4. verify ALERT/FLOW logging under the external owner;
-5. run allowed, denied, management, and return-path probes.
-
-Inject-mode endpoint records are deliberately unverified. A successful plan does
-not establish health or ownership.
+After plan, compare the observed VPC, policy, AZ set, and endpoint IDs with live
+AWS state and external routes. Verify `SyncStates`, attachment health, logging,
+and both traffic directions operationally; static validation cannot do so.

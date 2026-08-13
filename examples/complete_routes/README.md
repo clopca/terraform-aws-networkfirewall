@@ -1,25 +1,68 @@
-# Complete routes composition
+# AZ-local routes in external route tables
 
-Creates a two-AZ IPv4 firewall and composes its Tier 1 endpoint map into `modules/routes`. Each workload route selects the endpoint in the same Availability Zone and explicitly acknowledges that the route table is externally owned.
+This example creates a two-AZ firewall and composes its endpoint map into two
+routes in externally owned workload route tables. Use it when firewall placement
+and endpoint lifecycle belong to this state but route-table lifecycle remains in
+a VPC or network-foundation state.
 
-Replace every illustrative ID/ARN before apply. Confirm that no other Terraform state owns either `route_table_id + destination` identity; `acknowledge_external_route_table = true` is a responsibility boundary, not discovery.
+## What this demonstrates
 
-## Forward and return path
+- `vpc_endpoint_ids_by_firewall_by_az.primary` passes one endpoint ID per real
+  Availability Zone to `modules/routes`.
+- `routes.workload-a-default.availability_zone = "us-east-1a"` selects the
+  endpoint for route table A rather than relying on list order.
+- `routes.workload-b-default.availability_zone = "us-east-1b"` provides the
+  equivalent independent route identity for AZ B.
+- `destination.ipv4_cidr = "0.0.0.0/0"` creates an IPv4 default route in each
+  declared external table.
+- `acknowledge_external_route_table = true` records the caller's ownership
+  assertion; it does not discover competing state.
+- `route_ids` returns stable route handles keyed by the caller's route keys.
 
-A workload route table in each AZ sends its default route to the endpoint from
-the same AZ key. Post-firewall and return routes remain external; they must
-return the reverse flow through that same endpoint before the packet reaches
-the workload.
+Each workload route sends outbound traffic to its AZ-local endpoint. The
+post-firewall route and the reverse route back through that same endpoint remain
+external and must be validated separately.
 
+## Relevant configuration
 
-| Resource | Owner |
-|---|---|
-| Firewall and endpoints | Root module |
-| Two declared workload default routes | `modules/routes` |
-| Route tables, associations, post-firewall and return routes | External network stack |
-| Policy, rules, and logging | External prerequisites |
+The complete deployable configuration is in [`main.tf`](./main.tf). The external
+route-table composition is the distinguishing portion:
 
-Firewall endpoint charges apply if this example is applied. Run
-`terraform init`, `terraform validate`, and a saved `terraform plan` only after
-replacing placeholders. Verify attachment health and both traffic directions in
-each AZ; static validation does not prove exclusive route ownership or traffic.
+```hcl
+vpc_endpoint_ids_by_az = module.network_firewall.vpc_endpoint_ids_by_firewall_by_az.primary
+
+routes = {
+  workload-a-default = {
+    route_table_id                   = "rtb-01111111111111111"
+    availability_zone                = "us-east-1a"
+    acknowledge_external_route_table = true
+    destination                      = { ipv4_cidr = "0.0.0.0/0" }
+  }
+  workload-b-default = {
+    route_table_id                   = "rtb-02222222222222222"
+    availability_zone                = "us-east-1b"
+    acknowledge_external_route_table = true
+    destination                      = { ipv4_cidr = "0.0.0.0/0" }
+  }
+}
+```
+
+## Prerequisites and cost
+
+- Replace every VPC, subnet, policy, and route-table identifier before planning.
+- Confirm no other Terraform state owns either route-table/destination pair.
+- Define post-firewall and return routes for both AZs before cutover.
+- Applying creates two billable firewall endpoints and two routes; Network
+  Firewall processing and data-transfer charges can apply.
+
+## Run
+
+```shell
+terraform init
+terraform validate
+terraform plan -out=tfplan
+```
+
+After apply, wait for both endpoint attachments and run forward, return,
+allowed, and denied probes in each AZ. Static validation does not prove exclusive
+route ownership, endpoint readiness, or traffic symmetry.

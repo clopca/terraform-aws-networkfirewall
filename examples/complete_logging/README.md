@@ -1,24 +1,88 @@
-# Firewall with complete logging
+# Firewall with ALERT, FLOW, and TLS logging
 
-Creates one firewall, one CloudWatch log group, and one logging configuration containing ALERT, FLOW, and TLS destinations. The S3 bucket and Firehose delivery stream are injected because their durable storage, IAM, encryption, and retention lifecycles remain externally owned.
+This example creates one firewall, one managed CloudWatch log group, and one
+logging configuration with ALERT, FLOW, and TLS destinations. Use it to compose
+firewall identity with mixed destination ownership while keeping durable S3 and
+Firehose infrastructure outside the logging submodule.
 
-Replace the example VPC, subnet, policy, bucket, and delivery-stream values before applying.
+## What this demonstrates
+
+- `logging_configurations.primary.firewall_arn` consumes the stable root
+  `firewall_arns.primary` output.
+- `monitoring_dashboard = true` enables the Network Firewall monitoring
+  dashboard for the effective logging configuration.
+- `logs.alerts.log_type = "ALERT"` creates a CloudWatch destination and a log
+  group with 90-day retention.
+- `logs.flows.destination.s3` injects an existing bucket name and prefix; the
+  bucket, policy, encryption, and lifecycle remain external.
+- `logs.tls.destination.firehose` injects an existing delivery-stream name; the
+  stream and its IAM/S3 dependencies remain external.
+- `logging_destination_records.primary` returns normalized destination handles
+  without exposing provider objects.
+
+Forward and return packets traverse the same externally routed firewall path.
+The firewall sends each enabled log class to its configured destination;
+logging composition does not create or change traffic routes.
+
+## Relevant configuration
+
+The complete deployable configuration is in [`main.tf`](./main.tf). The mixed
+logging ownership is the distinguishing portion:
+
+```hcl
+logging_configurations = {
+  primary = {
+    firewall_arn         = module.network_firewall.firewall_arns.primary
+    monitoring_dashboard = true
+    logs = {
+      alerts = {
+        log_type = "ALERT"
+        destination = {
+          cloudwatch = {
+            log_group_name    = "/aws/network-firewall/example/alerts"
+            retention_in_days = 90
+          }
+        }
+      }
+      flows = {
+        log_type = "FLOW"
+        destination = {
+          s3 = {
+            bucket_name = "replace-with-existing-log-bucket"
+            prefix      = "network-firewall/flow"
+          }
+        }
+      }
+      tls = {
+        log_type = "TLS"
+        destination = {
+          firehose = {
+            delivery_stream_name = "replace-with-existing-delivery-stream"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Prerequisites and cost
+
+- Replace the VPC, subnet, policy, bucket, and Firehose values before planning.
+- The external S3 bucket and Firehose stream need Network Firewall delivery
+  permissions in the selected Region.
+- Applying creates one firewall endpoint and one CloudWatch log group. Network
+  Firewall, CloudWatch ingestion/retention, S3, Firehose, and transfer charges
+  can apply.
+
+## Run
 
 ```shell
 terraform init
-terraform plan
+terraform validate
+terraform plan -out=tfplan
 ```
 
-## Traffic and telemetry flow
-
-Forward and return packets traverse the same firewall endpoint and produce the
-configured log classes. ALERT records are delivered to the managed CloudWatch
-log group, FLOW records to the external S3 bucket, and TLS records to the
-external Firehose stream. Routing remains externally owned.
-
-
-The firewall and CloudWatch log group incur charges; S3 and Firehose resources
-must already exist with correct service permissions. This example creates no
-routes. After apply, verify forward/return traffic separately and confirm all
-three destinations receive current records. Static validation cannot verify
-destination existence, permissions, delivery, or traffic.
+After apply, verify current records in all three destinations and test both
+traffic directions. Static validation cannot verify destination existence,
+permissions, delivery, or traffic.
