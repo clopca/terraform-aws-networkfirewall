@@ -428,7 +428,11 @@ resource "aws_networkfirewall_rule_group" "external_content" {
   }
 
   lifecycle {
-    ignore_changes = [rule_group, rules]
+    ignore_changes = [
+      rule_group[0].rule_variables,
+      rule_group[0].rules_source,
+      rules,
+    ]
   }
 
   depends_on = [terraform_data.rule_group_contract]
