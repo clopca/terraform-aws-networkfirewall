@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented in phase 2
+Implemented in 2.0
 
 ## Decision
 

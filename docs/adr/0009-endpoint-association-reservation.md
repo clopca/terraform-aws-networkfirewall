@@ -2,11 +2,11 @@
 
 ## Status
 
-Reserved for phase 3
+Proposed; not supported in 2.0
 
 ## Decision
 
-The phase-3 VPC endpoint association contract will not place a map of subnets beneath one association. AWS and provider 6.60 permit exactly one `SubnetMapping` per `aws_networkfirewall_vpc_endpoint_association`; the earlier one-association-to-many-subnets shape is not implementable.
+A future VPC endpoint association contract must not place a map of subnets beneath one association. AWS and provider 6.60 permit exactly one `SubnetMapping` per `aws_networkfirewall_vpc_endpoint_association`; the earlier one-association-to-many-subnets shape is not implementable.
 
 The corrected expansion is one association resource per subnet and AZ, addressed as:
 

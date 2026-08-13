@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-Tier 1 outputs are semver-protected composition handles: firewall ARNs, IDs, names, endpoint IDs by firewall and zone, and endpoint records by firewall and zone. Collection absence is `{}` and optional scalar absence is `null`.
+Tier 1 outputs are semver-protected composition handles: firewall ARNs, IDs, names, effective firewall policy ARNs, VPC endpoint IDs by firewall and AZ, and endpoint records by firewall and AZ. Collection absence is `{}` and optional scalar absence is `null`.
 
 Tier 2 is the v1 migration bridge. `aws_network_firewall` returns the complete created provider object only when the firewall key is `primary`; it is deprecated in v2 and will be removed in v3.
 

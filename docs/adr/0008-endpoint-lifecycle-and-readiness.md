@@ -14,7 +14,9 @@ Accepted
 
 AWS declares a subnet mapping's address family immutable, while provider 6.60 models a family diff as associate/disassociate rather than Terraform resource replacement. A family change is therefore not an ordinary update. The supported path is a blue/green firewall: create the new family under a new firewall key, wait for `READY`, cut routes by AZ, verify traffic, and retire the old firewall. AWS offers no flow-drain or continuity guarantee.
 
-Terraform variable preconditions can validate a proposed family but cannot compare it with a prior state value. The module does not claim that a syntactic precondition can detect history. `subnet_change_protection = true` remains the default AWS guard, the upgrade gate rejects mapping diffs, and an acceptance/state test must detect endpoint-ID change. A future provider plan modifier or stateful contract primitive is required for a true historical plan-time rejection.
+Terraform variable preconditions cannot compare a proposed family with its prior state value. The public contract therefore fails closed for every non-IPv4 mapping unless `address_family_migration_ack = true`. That plan-known acknowledgement means the caller has created a new mapping or reviewed a blue/green cutover; it is not evidence that an in-place family mutation is safe. A stateful native test applies IPV4 and proves that planning DUALSTACK on the same firewall/AZ key without acknowledgement fails.
+
+Known `availability_zone_id` values must be unique across endpoint mappings. Subnet IDs or AZ metadata that remain unknown during planning cannot be looked up reliably without changing the module's ownership and credential boundary, so AWS validates their actual VPC/AZ at apply. The contract documents that deferred limit instead of claiming map keys prove physical subnet placement.
 
 ## Readiness
 
@@ -23,7 +25,7 @@ Provider 6.60 waits for global firewall `READY` during managed create and update
 Each endpoint record instead declares `readiness_guarantee`:
 
 - `provider_waited` for a managed firewall;
-- `observed_ready` for an injected firewall whose data-source attachment was `READY` at refresh;
-- `unverified` when injected readiness was not observed.
+- `observed_ready` for an injected firewall only when global status is `READY`, configuration sync is `IN_SYNC`, and every requested AZ/subnet attachment is `READY` at refresh;
+- `unverified` when any global, sync, or requested attachment condition is not ready.
 
 Injected placement is optional observation metadata. When supplied, its AZ/subnet pairs are checked against the data source and provide plan-known output keys; when omitted, endpoint maps are empty.

@@ -18,4 +18,4 @@ The provider floor was verified locally on 2026-08-13 with Terraform 1.15.8 and 
 - `aws_cloudwatch_log_group`: retention and KMS configuration;
 - `aws_route`: IPv4, IPv6, prefix-list destinations, and VPC endpoint targets.
 
-6.59 is the lowest version verified for the complete phase-1 contract. The `< 7.0` ceiling prevents an unreviewed provider-major schema change. Lowering the floor requires a checked schema matrix plus the complete test suite; it is not inferred from individual resource release dates.
+6.59 is the lowest version verified for the complete 2.0 contract. The `< 7.0` ceiling prevents an unreviewed provider-major schema change. Lowering the floor requires a checked schema matrix plus the complete test suite; it is not inferred from individual resource release dates.

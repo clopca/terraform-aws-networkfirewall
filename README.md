@@ -4,9 +4,37 @@ This module creates or references AWS Network Firewall resources with stable cal
 
 Firewall policies, VPCs, subnets, route tables, KMS keys, S3 buckets, and Firehose delivery streams remain independently owned and are supplied by ARN or ID.
 
-## Usage
+## Quick start
+
+The minimal path accepts existing VPC, subnet, and policy handles without depending on another module's output shape:
 
 ```hcl
+terraform {
+  required_version = ">= 1.7"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 6.59, < 7.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "firewall_policy_arn" {
+  type = string
+}
+
+variable "endpoint_subnet_ids_by_az" {
+  type = map(string)
+}
+
 module "network_firewall" {
   source  = "aws-ia/networkfirewall/aws"
   version = "~> 2.0"
@@ -14,15 +42,15 @@ module "network_firewall" {
   firewalls = {
     primary = {
       name       = "inspection"
-      policy_arn = aws_networkfirewall_firewall_policy.inspection.arn
+      policy_arn = var.firewall_policy_arn
       placement = {
         vpc = {
-          vpc_id = module.vpc.vpc_id
+          vpc_id = var.vpc_id
           endpoint_subnets = {
-            for zone, subnet_id in module.vpc.subnet_ids_by_group_by_az.firewall :
-            zone => {
+            for availability_zone, subnet_id in var.endpoint_subnet_ids_by_az :
+            availability_zone => {
               subnet_id       = subnet_id
-              ip_address_type = "DUALSTACK"
+              ip_address_type = "IPV4"
             }
           }
         }
@@ -33,7 +61,13 @@ module "network_firewall" {
 }
 ```
 
-Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc`. All four firewall protections default to `true`. Inject mode uses `create = false` with `arn` and observes the firewall without taking lifecycle ownership. The normal root call uses one `firewalls.primary` entry; additional keys are for firewalls intentionally sharing the same state, account, Region, owner, and lifecycle.
+```shell
+terraform init
+terraform validate
+terraform plan
+```
+
+Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc`. All four firewall protections default to `true`. Inject mode uses `create = false` with `arn` and observes the firewall without taking lifecycle ownership. The normal root call uses one `firewalls.primary` entry; additional keys are for firewalls intentionally sharing the same state, account, Region, owner, and lifecycle. VPC module v5 composition is documented separately and requires that output contract to be available.
 
 ## Lifecycle impact
 
@@ -43,7 +77,9 @@ Create mode is the default and requires `name`, `policy_arn`, and `placement.vpc
 | Physical endpoint replacement | endpoint `subnet_id`, `ip_address_type` | Keeps the firewall ARN but replaces the `vpce-*`; update routes only after the replacement endpoint is ready. |
 | Mutable | policy ARN, protections, description, analysis types, customer KMS, tags | Updates in place, with service-specific dataplane impact. |
 
-AWS does not support changing a subnet mapping's address family in place. Use a blue/green firewall and cut routes over by AZ; do not treat an IPv4-to-dual-stack change as an ordinary update.
+AWS does not support changing a subnet mapping's address family in place. Every new `IPV6` or `DUALSTACK` mapping therefore requires `address_family_migration_ack = true`; this is a plan-known acknowledgement that the mapping is new or part of a reviewed blue/green cutover, not permission to mutate an existing endpoint casually. Use a new firewall key, wait for readiness, cut routes over by AZ, and retire the old firewall.
+
+Known `availability_zone_id` values must be unique across `endpoint_subnets`. Terraform cannot prove a subnet's real VPC/AZ when those handles are unknown at plan time, so AWS remains the authority for unresolved subnet metadata.
 
 ## Logging
 
@@ -97,6 +133,8 @@ Stable outputs are `firewall_arns`, `firewall_ids`, `firewall_names`, `firewall_
 
 - [`basic`](examples/basic): a dual-stack firewall in caller-owned subnets.
 - [`complete_logging`](examples/complete_logging): ALERT, FLOW, and TLS with CloudWatch, S3, and Firehose destinations.
+- [`complete_routes`](examples/complete_routes): two-AZ firewall composition with caller-owned route tables and explicit route ownership acknowledgement.
+- [`migration_pre_v1_routes`](examples/migration_pre_v1_routes): executable twelve-route old→v1→semantic-key migration chain.
 - [`rule_groups_suricata`](examples/rule_groups_suricata): an attested Suricata bundle with typed IP/port bindings and SID range.
 - [`policy_control_gate`](examples/policy_control_gate): observation/selective/enforce, incident overrides, and candidate/active/LKG releases.
 
