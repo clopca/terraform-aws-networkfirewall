@@ -57,9 +57,10 @@ run "create_dual_stack_firewall" {
             vpc_id = "vpc-0123456789abcdef0"
             endpoint_subnets = {
               "us-east-1a" = {
-                subnet_id            = "subnet-0123456789abcdef0"
-                availability_zone_id = "use1-az1"
-                ip_address_type      = "DUALSTACK"
+                subnet_id                    = "subnet-0123456789abcdef0"
+                availability_zone_id         = "use1-az1"
+                ip_address_type              = "DUALSTACK"
+                address_family_migration_ack = true
               }
             }
           }
@@ -118,8 +119,8 @@ run "plan_all_endpoint_address_families" {
             vpc_id = "vpc-0123456789abcdef0"
             endpoint_subnets = {
               "us-east-1a" = { subnet_id = "subnet-11111111111111111", ip_address_type = "IPV4" }
-              "us-east-1b" = { subnet_id = "subnet-22222222222222222", ip_address_type = "IPV6" }
-              "us-east-1c" = { subnet_id = "subnet-33333333333333333", ip_address_type = "DUALSTACK" }
+              "us-east-1b" = { subnet_id = "subnet-22222222222222222", ip_address_type = "IPV6", address_family_migration_ack = true }
+              "us-east-1c" = { subnet_id = "subnet-33333333333333333", ip_address_type = "DUALSTACK", address_family_migration_ack = true }
             }
           }
         }
@@ -361,6 +362,43 @@ run "reject_logical_endpoint_az_key" {
             }
           }
         }
+      }
+    }
+  }
+  expect_failures = [terraform_data.firewall_contract["bad"]]
+}
+
+run "reject_duplicate_availability_zone_ids" {
+  command = plan
+  variables {
+    firewalls = {
+      bad = {
+        name       = "bad"
+        policy_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/policy"
+        placement = { vpc = {
+          vpc_id = "vpc-1"
+          endpoint_subnets = {
+            "us-east-1a" = { subnet_id = "subnet-a", availability_zone_id = "use1-az1" }
+            "us-east-1b" = { subnet_id = "subnet-b", availability_zone_id = "use1-az1" }
+          }
+        } }
+      }
+    }
+  }
+  expect_failures = [terraform_data.firewall_contract["bad"]]
+}
+
+run "reject_managed_settings_in_inject_mode" {
+  command = plan
+  variables {
+    firewalls = {
+      bad = {
+        create                 = false
+        arn                    = "arn:aws:network-firewall:us-east-1:123456789012:firewall/injected"
+        protections            = { delete = false, policy_change = false, subnet_change = false, availability_zone_change = false }
+        enabled_analysis_types = ["TLS_SNI"]
+        encryption             = { type = "CUSTOMER_KMS", key_arn = "arn:aws:kms:us-east-1:123456789012:key/00000000-0000-0000-0000-000000000000" }
+        tags                   = { Environment = "ignored" }
       }
     }
   }

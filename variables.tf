@@ -13,12 +13,13 @@ variable "firewalls" {
     placement = optional(object({
       vpc = optional(object({
         vpc_id = string
-        # Keys are AWS Availability Zone names (for example, us-east-1a),
-        # which enforce at most one primary subnet mapping per AZ.
+        # Keys are caller-declared AWS Availability Zone names. Plan-time checks
+        # reject duplicate known AZ IDs, but cannot query unknown subnet metadata.
         endpoint_subnets = map(object({
-          subnet_id            = string
-          availability_zone_id = optional(string)
-          ip_address_type      = optional(string, "IPV4")
+          subnet_id                    = string
+          availability_zone_id         = optional(string)
+          ip_address_type              = optional(string, "IPV4")
+          address_family_migration_ack = optional(bool, false)
         }))
       }))
       transit_gateway = optional(object({

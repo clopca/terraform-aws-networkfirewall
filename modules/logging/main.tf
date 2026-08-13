@@ -12,6 +12,19 @@ locals {
   ])...)
 }
 
+resource "terraform_data" "logging_arn_uniqueness" {
+  input = sort([for configuration in values(var.logging_configurations) : configuration.firewall_arn])
+
+  lifecycle {
+    precondition {
+      condition = length(distinct([
+        for configuration in values(var.logging_configurations) : configuration.firewall_arn
+      ])) == length(var.logging_configurations)
+      error_message = "logging_configurations must contain each firewall_arn exactly once. AWS exposes one logging configuration per firewall; merge destinations under a single caller key."
+    }
+  }
+}
+
 resource "terraform_data" "logging_contract" {
   for_each = var.logging_configurations
 
@@ -98,7 +111,7 @@ resource "aws_cloudwatch_log_group" "this" {
   kms_key_id        = each.value.kms_key_arn
   tags              = each.value.tags
 
-  depends_on = [terraform_data.logging_contract]
+  depends_on = [terraform_data.logging_contract, terraform_data.logging_arn_uniqueness]
 }
 
 locals {
@@ -146,5 +159,5 @@ resource "aws_networkfirewall_logging_configuration" "this" {
     }
   }
 
-  depends_on = [terraform_data.logging_contract]
+  depends_on = [terraform_data.logging_contract, terraform_data.logging_arn_uniqueness]
 }

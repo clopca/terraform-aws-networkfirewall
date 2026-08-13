@@ -24,6 +24,22 @@ locals {
     }
   }
 
+  injected_firewall_observed_ready = {
+    for firewall_key, firewall in local.injected_firewalls : firewall_key => try(
+      data.aws_networkfirewall_firewall.this[firewall_key].firewall_status[0].status == "READY" &&
+      data.aws_networkfirewall_firewall.this[firewall_key].firewall_status[0].configuration_sync_state_summary == "IN_SYNC" &&
+      alltrue([
+        for availability_zone, endpoint in firewall.placement.vpc.endpoint_subnets : anytrue([
+          for sync_state in data.aws_networkfirewall_firewall.this[firewall_key].firewall_status[0].sync_states :
+          sync_state.availability_zone == availability_zone &&
+          sync_state.attachment[0].subnet_id == endpoint.subnet_id &&
+          sync_state.attachment[0].status == "READY"
+        ])
+      ]),
+      false,
+    ) if try(firewall.placement.vpc, null) != null
+  }
+
   injected_vpc_endpoint_records = {
     for firewall_key, firewall in local.injected_firewalls : firewall_key => (
       try(firewall.placement.vpc, null) == null ? {} : {
@@ -37,11 +53,7 @@ locals {
           availability_zone    = availability_zone
           availability_zone_id = endpoint.availability_zone_id
           ip_address_type      = endpoint.ip_address_type
-          readiness_guarantee = try([
-            for sync_state in data.aws_networkfirewall_firewall.this[firewall_key].firewall_status[0].sync_states :
-            sync_state.attachment[0].status == "READY" ? "observed_ready" : "unverified"
-            if sync_state.availability_zone == availability_zone && sync_state.attachment[0].subnet_id == endpoint.subnet_id
-          ][0], "unverified")
+          readiness_guarantee  = local.injected_firewall_observed_ready[firewall_key] ? "observed_ready" : "unverified"
         }
       }
     )
@@ -79,9 +91,17 @@ resource "terraform_data" "firewall_contract" {
       condition = each.value.create || (
         each.value.name == null &&
         each.value.description == null &&
-        each.value.policy_arn == null
+        each.value.policy_arn == null &&
+        each.value.protections.delete &&
+        each.value.protections.policy_change &&
+        each.value.protections.subnet_change &&
+        each.value.protections.availability_zone_change &&
+        length(each.value.enabled_analysis_types) == 0 &&
+        each.value.encryption.type == "AWS_OWNED_KMS_KEY" &&
+        each.value.encryption.key_arn == null &&
+        length(each.value.tags) == 0
       )
-      error_message = "Injected firewall '${each.key}' cannot include managed name, description, or policy_arn. Remove them; placement.vpc, when present, is observation metadata only."
+      error_message = "Injected firewall '${each.key}' cannot include managed name, description, policy_arn, non-default protections, enabled_analysis_types, encryption, or tags. Remove them; placement.vpc, when present, is observation metadata only."
     }
 
     precondition {
@@ -124,11 +144,31 @@ resource "terraform_data" "firewall_contract" {
     }
 
     precondition {
+      condition = try(each.value.placement.vpc, null) == null || try(
+        length(distinct(compact([
+          for endpoint in values(each.value.placement.vpc.endpoint_subnets) : endpoint.availability_zone_id
+          ]))) == length(compact([
+          for endpoint in values(each.value.placement.vpc.endpoint_subnets) : endpoint.availability_zone_id
+        ])),
+        false,
+      )
+      error_message = "Firewall '${each.key}' repeats an availability_zone_id across endpoint_subnets. Use at most one declared subnet mapping per physical AZ. Unknown subnet/AZ metadata remains an AWS apply-time check."
+    }
+
+    precondition {
+      condition = try(each.value.placement.vpc, null) == null || try(alltrue([
+        for endpoint in values(each.value.placement.vpc.endpoint_subnets) :
+        endpoint.ip_address_type == "IPV4" || endpoint.address_family_migration_ack
+      ]), false)
+      error_message = "Firewall '${each.key}' uses IPV6 or DUALSTACK without address_family_migration_ack=true. Acknowledge only a new/blue-green mapping; changing family on an existing firewall/AZ key is not an ordinary update."
+    }
+
+    precondition {
       condition = try(each.value.placement.vpc, null) == null || try(alltrue([
         for endpoint in values(each.value.placement.vpc.endpoint_subnets) :
         contains(["IPV4", "IPV6", "DUALSTACK"], endpoint.ip_address_type)
       ]), false)
-      error_message = "Firewall '${each.key}' has an invalid ip_address_type. Use IPV4, IPV6, or DUALSTACK. Changing the family of an existing mapping is not an ordinary update; create a blue/green firewall and cut routes over after it is READY."
+      error_message = "Firewall '${each.key}' has an invalid ip_address_type. Use IPV4, IPV6, or DUALSTACK. Changing the family of an existing mapping requires explicit acknowledgement and a blue/green route cutover."
     }
 
     precondition {

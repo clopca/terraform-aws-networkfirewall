@@ -205,3 +205,21 @@ run "do_not_manage_logging_configuration" {
     error_message = "manage=false must remove the effective Network Firewall logging configuration from ownership."
   }
 }
+
+run "reject_duplicate_firewall_arn_ownership" {
+  command = plan
+  module { source = "./modules/logging" }
+  variables {
+    logging_configurations = {
+      first = {
+        firewall_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall/shared"
+        logs         = { alerts = { log_type = "ALERT", destination = { s3 = { bucket_name = "logs" } } } }
+      }
+      second = {
+        firewall_arn = "arn:aws:network-firewall:us-east-1:123456789012:firewall/shared"
+        logs         = { flows = { log_type = "FLOW", destination = { s3 = { bucket_name = "logs" } } } }
+      }
+    }
+  }
+  expect_failures = [terraform_data.logging_arn_uniqueness]
+}

@@ -22,12 +22,14 @@ module "network_firewall" {
           vpc_id = "vpc-0123456789abcdef0"
           endpoint_subnets = {
             "us-east-1a" = {
-              subnet_id       = "subnet-01111111111111111"
-              ip_address_type = "DUALSTACK"
+              subnet_id                    = "subnet-01111111111111111"
+              ip_address_type              = "DUALSTACK"
+              address_family_migration_ack = true
             }
             "us-east-1b" = {
-              subnet_id       = "subnet-02222222222222222"
-              ip_address_type = "DUALSTACK"
+              subnet_id                    = "subnet-02222222222222222"
+              ip_address_type              = "DUALSTACK"
+              address_family_migration_ack = true
             }
           }
         }
