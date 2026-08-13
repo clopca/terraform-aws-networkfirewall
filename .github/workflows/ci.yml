@@ -89,13 +89,7 @@ jobs:
           done
 
       - name: Validate examples
-        shell: bash
-        run: |
-          set -euo pipefail
-          for example in basic complete_logging complete_routes rule_groups_suricata policy_control_gate migration_pre_v1_routes; do
-            terraform -chdir="examples/${example}" init -backend=false -lockfile=readonly
-            terraform -chdir="examples/${example}" validate -no-color
-          done
+        run: ./scripts/validate-examples.sh
 
       - name: Run Terraform-native tests
         run: terraform test -no-color
@@ -113,6 +107,21 @@ jobs:
           archive_dir="$(mktemp -d)"
           trap 'rm -rf "$archive_dir"' EXIT
           git archive --format=tar HEAD | tar -xf - -C "$archive_dir"
+          terraform -chdir="$archive_dir" fmt -check -recursive
           terraform -chdir="$archive_dir" init -backend=false -lockfile=readonly
           terraform -chdir="$archive_dir" validate -no-color
+          for module in logging routes rule-groups policy-control; do
+            terraform -chdir="$archive_dir/modules/${module}" init -backend=false -lockfile=readonly
+            terraform -chdir="$archive_dir/modules/${module}" validate -no-color
+          done
+          "$archive_dir/scripts/validate-examples.sh"
           terraform -chdir="$archive_dir" test -no-color
+          (
+            cd "$archive_dir"
+            tflint --recursive
+          )
+          "$archive_dir/scripts/check-docs.sh"
+          "$archive_dir/scripts/check-contract.sh"
+          "$archive_dir/scripts/test-migration-plan-guard.sh"
+          "$archive_dir/scripts/test-policy-managed-override-mutation.sh"
+          "$archive_dir/scripts/test-product-moved-mutation.sh"

@@ -8,3 +8,21 @@ Replace the example VPC, subnet, and policy ARNs before applying.
 terraform init
 terraform plan
 ```
+
+## Forward and return path
+
+```mermaid
+flowchart LR
+  Source[Source subnet] -->|externally owned forward route| EPA[Firewall endpoint A]
+  EPA --> NFW[Network Firewall]
+  NFW --> Destination[Destination path]
+  Destination -->|externally owned return route| EPA
+  EPA --> NFW
+  NFW --> Source
+```
+
+This example creates no routes or logging. Before apply, review Network Firewall
+endpoint and dual-stack charges. After apply, wait for both AZ attachments,
+compose same-AZ forward/return routes, and verify allowed, denied, management,
+IPv4, and IPv6 traffic. Static validation does not prove traffic or AWS resource
+existence.

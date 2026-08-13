@@ -207,7 +207,8 @@ attachment health before route cutover.
 
 ## Golden path
 
-The [`basic`](../examples/basic) and
-[`complete_routes`](../examples/complete_routes) examples demonstrate the two
-Network Firewall sides of this contract. Static validation proves schema
-compatibility only; it does not provision a VPC or prove traffic.
+[`examples/end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5) shows the complete
+contract. Until the VPC v5 Registry release is available, repository validation
+rewrites only its VPC source to a checked-in contract fixture. That static check
+proves the example uses the expected input/output shape; it does not provision a
+VPC or prove traffic.

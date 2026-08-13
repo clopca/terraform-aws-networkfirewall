@@ -11,16 +11,16 @@ ownership you want in the same Terraform state.
 1. Read the root [README](../README.md), especially ownership and cost warnings.
 2. Review [module composition](architecture/module-composition.md) and
    [zonal traffic flow](architecture/zonal-traffic-flow.md).
-3. Compare [`basic`](../examples/basic) with the external-table
-   [`complete_routes`](../examples/complete_routes) composition.
+3. Compare [`basic`](../examples/basic) with
+   [`end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5).
 4. Run `terraform init -backend=false` and `terraform validate`; these checks do
    not create AWS resources and do not prove dataplane correctness.
 
 ### First deployment
 
 1. Confirm the [prerequisites and quick start](../README.md#quick-start).
-2. Start with [`basic`](../examples/basic) for firewall placement and
-   [`complete_routes`](../examples/complete_routes) for route composition.
+2. Start with [`basic`](../examples/basic) for an existing VPC/policy, or
+   [`end_to_end_vpc_v5`](../examples/end_to_end_vpc_v5) for the complete path.
 3. Read [VPC v5 composition](VPC-V5-COMPOSITION.md) and
    [how to use outputs](how-to-use-outputs.md).
 4. Plan both forward and return routes by AZ before applying.
