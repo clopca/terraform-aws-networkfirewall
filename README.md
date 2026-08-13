@@ -76,9 +76,8 @@ external.
 - An existing AWS Network Firewall policy ARN in the same account and Region.
 - AWS credentials only for `plan` or `apply`; documentation smoke tests require none.
 
-The Registry source below is the canonical v2 usage. Repository tests extract
-this block and replace only the module source with the local checkout so the
-contract remains testable before and after publication.
+The Registry source below is the canonical v2 usage. The documentation guard
+validates the same configuration against the local checkout.
 
 ```hcl
 terraform {
@@ -234,7 +233,7 @@ firewall ARN to `modules/logging`.
 VPC v5 owns its VPC, subnets, route tables, and native routes. This module owns
 firewall endpoint mappings. Use [`modules/routes`](modules/routes) only for
 route tables owned outside VPC v5 or integrations that cannot use its native
-late-bound route target. See [VPC v5 composition](docs/VPC-V5-COMPOSITION.md)
+late-bound route target. See [VPC v5 composition](docs/vpc-v5-composition.md)
 and [`end_to_end_vpc_v5`](examples/end\_to\_end\_vpc\_v5).
 
 ## Choose a path
@@ -270,9 +269,9 @@ and [`end_to_end_vpc_v5`](examples/end\_to\_end\_vpc\_v5).
 
 Terraform validates attestation shape but cannot prove evidence independence.
 Use a separately published manifest with its own digest or signature, bundle
-digest, validation job and commit, and verify it in CI. See
-[rule management](docs/rule-management.md) and the
-[rule ownership diagram](docs/architecture/rule-management-models.md).
+digest, and immutable validation context. See
+[rule management](docs/rule-management.md) for source lanes, ownership,
+evidence, observation variants, and typed policy composition.
 
 ## Operational policy gate
 
@@ -290,7 +289,7 @@ Per-group incident overrides take precedence over incident-wide posture, which
 takes precedence over `enforce_from`. Temporary posture requires `change_id`,
 `owner`, and `expires_at`; Terraform does not auto-revert expired metadata.
 Stateless rules remain enforced in every mode. See the
-[policy release guide](docs/policy-releases-and-enforcement.md) and
+[policy release guide](docs/policy-control.md) and
 [operations runbooks](docs/operations/README.md).
 
 ## Lifecycle and migration
@@ -315,12 +314,13 @@ The guard always rejects delete and replace. See the
 ## Documentation
 
 - [Documentation map](docs/README.md) — choose a path by task or experience level.
-- [Outputs and composition](docs/how-to-use-outputs.md) — Tier 1/2/3 contracts and recipes.
-- [VPC v5 composition](docs/VPC-V5-COMPOSITION.md) — ownership and forward/return routing.
-- [Rule management](docs/rule-management.md) — IaC, AWS-managed, and dynamic SecOps models.
+- [Outputs](docs/outputs.md) — stable Tier 1 composition, the v1 bridge, and the Tier 3 escape hatch.
+- [VPC v5 composition](docs/vpc-v5-composition.md) — placement, route ownership, symmetry, and readiness.
+- [Rule management](docs/rule-management.md) — source lanes, content ownership, evidence, and typed records.
+- [Policy control](docs/policy-control.md) — immutable releases, enforcement, incident controls, and rollback.
+- [Security and operations](docs/security-and-operations.md) — protections, logging, monitoring, and change controls.
 - [Operations](docs/operations/README.md) — promotion, incident rollback, and hotfix runbooks.
 - [Troubleshooting](docs/troubleshooting.md) and [FAQ](docs/faq.md).
-- [Architecture diagrams](docs/architecture/README.md).
 - [Architecture decisions](docs/adr/README.md) — decision status and delivery index.
 - [2.0 upgrade guide](docs/UPGRADE-GUIDE-2.0.md) and [historical 1.0 upgrade](docs/UPGRADE-GUIDE-1.0.md).
 - [Changelog](CHANGELOG.md), [contribution guide](CONTRIBUTING.md), and
