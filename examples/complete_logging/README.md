@@ -71,6 +71,16 @@ logging_configurations = {
 - Replace the VPC, subnet, policy, bucket, and Firehose values before planning.
 - The external S3 bucket and Firehose stream need Network Firewall delivery
   permissions in the selected Region.
+- Once TLS log delivery starts, AWS adds the tag `LogDeliveryEnabled = "true"`
+  to the delivery stream. If the stream is managed by Terraform elsewhere, that
+  state shows a perpetual one-tag diff. Add this to the
+  `aws_kinesis_firehose_delivery_stream` resource that owns the stream:
+
+  ```hcl
+  lifecycle {
+    ignore_changes = [tags["LogDeliveryEnabled"]]
+  }
+  ```
 - Applying creates one firewall endpoint and one CloudWatch log group. Network
   Firewall, CloudWatch ingestion/retention, S3, Firehose, and transfer charges
   can apply.

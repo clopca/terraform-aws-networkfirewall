@@ -154,6 +154,15 @@ CloudWatch log groups can be created by the logging submodule. S3 buckets and
 Firehose streams are injected by name and remain external; verify existence,
 Region, policy/IAM, encryption, and service delivery permissions.
 
+### Perpetual one-tag diff on a Firehose delivery stream
+
+If the Terraform state that owns the delivery stream shows a recurring
+`0 add / 1 change` plan removing the tag `LogDeliveryEnabled`, that tag is
+added by AWS when Network Firewall log delivery starts and is reinstated after
+every apply. Add `ignore_changes = [tags["LogDeliveryEnabled"]]` to the
+`aws_kinesis_firehose_delivery_stream` resource. This is external-stream
+behavior, not module drift.
+
 Changing `monitoring_dashboard` can temporarily remove and reinstate all
 logging destinations with AWS provider 6.60. Use a change window and verify log
 delivery after apply.

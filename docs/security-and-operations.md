@@ -148,6 +148,13 @@ Destination ownership is explicit:
 | Amazon S3 | Bucket, policy, encryption, retention, object lock, and lifecycle remain external; supply the bucket name and optional prefix. |
 | Kinesis Data Firehose | Delivery stream and its IAM/S3 dependencies remain external; supply the stream name. |
 
+When log delivery to Firehose starts, AWS tags the delivery stream with
+`LogDeliveryEnabled = "true"` (vended-logs pricing marker). A Terraform state
+that owns the stream will try to remove that tag on every plan. Declare
+`ignore_changes = [tags["LogDeliveryEnabled"]]` on the
+`aws_kinesis_firehose_delivery_stream` resource in the owning state. Verified
+against a real delivery stream during apply validation.
+
 One firewall ARN cannot appear under multiple logging configuration keys.
 `manage = false` removes the effective logging configuration from Terraform; it
 is not a pause switch. Changing `monitoring_dashboard` with AWS provider 6.60 can
