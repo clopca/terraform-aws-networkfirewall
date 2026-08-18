@@ -17,6 +17,9 @@ changing configuration.
 | Temporary posture did not expire | Expected behavior | `expires_at` is metadata; apply an explicit return to normal. |
 | Route already exists/conflicts | Multiple owners | Find the state/stack owning the route-table/destination pair; do not duplicate ownership. |
 | Content hotfix absent from plan | Dynamic SecOps mode | Verify the external `UpdateRuleGroup` delivery record; post-bootstrap content drift is ignored. |
+| Apply rejects `availability_zone_change` protection | VPC attached to Cloud WAN / Transit Gateway | Set `availability_zone_change = false` for centralized-inspection firewalls; see security-and-operations. |
+| Rule group deletion fails "still in use" | Reference and group removed in one apply | Two-step removal: apply the policy without the reference first, then delete the group. |
+| Operations hang after enabling default-deny | Pre-existing long-lived connections lost flow state | Restart affected agents/instances; choose `stream_exception_policy` before the window. |
 | README drift guard fails | Generated README stale | Run `terraform-docs .`, review both `.header.md` and generated tables, then rerun `scripts/check-docs.sh`. |
 
 ## Initialization and validation
@@ -139,6 +142,31 @@ Inspect `effective_releases`, not only the requested mode.
 Any non-normal incident posture or non-empty group override requires all three:
 `change_id`, `owner`, and `expires_at`. Normal posture must not retain stale
 incident metadata. Expiry does not trigger an automatic apply.
+
+### Removing a rule group fails with "still in use"
+
+Deleting a rule group and removing its policy reference in the same apply can
+fail with `InvalidOperationException: rule group is still in use`. When both
+disappear from the configuration, the dependency edge between them disappears
+too, so Terraform may destroy the group before it updates the live policy that
+still references it. This is an ordering problem, not propagation delay --
+retrying the same apply does not fix it.
+
+Remove in two steps: first apply the policy without the reference, then apply
+the deletion of the now-orphaned rule group.
+
+### Long-lived connections hang after a default-deny window
+
+After a policy change to strict default-deny (`aws:drop_strict`), connections
+established before the change lose their flow state in the engine: mid-stream
+packets arrive without a known session and fall to the stream exception policy.
+The symptom is deceptive -- agents that reconnect show healthy (for example, an
+SSM agent reports `PingStatus=Online` over a fresh channel) while operations
+using the pre-existing stream hang indefinitely. Restart the affected agents or
+instances to re-establish connections; do not diagnose the hang as an IAM or
+routing problem. Choose `stream_exception_policy` deliberately before an
+enforcement window: `REJECT` resets orphaned streams immediately, which
+surfaces the break instead of hanging it.
 
 ## Logging
 

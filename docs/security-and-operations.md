@@ -57,6 +57,15 @@ functional change when practical, record the rollback, and restore the intended
 protection immediately after verification. Never disable all protections merely
 to make a plan apply.
 
+**`availability_zone_change` is incompatible with centralized inspection.** AWS
+rejects enabling availability-zone change protection on a firewall whose VPC is
+attached to AWS Cloud WAN or a Transit Gateway (verified against a real
+deployment; the failure surfaces at apply time, not at plan). The module cannot
+detect the attachment -- it is created outside the firewall's own
+configuration -- so consumers building centralized inspection VPCs must set
+`availability_zone_change = false` explicitly and rely on the remaining three
+protections. Standalone (distributed) firewalls keep the default.
+
 Inject mode observes the live protection state but cannot promise or manage it.
 The external firewall owner must provide equivalent change controls.
 
